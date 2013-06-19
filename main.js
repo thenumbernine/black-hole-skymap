@@ -173,14 +173,14 @@ function updateLightPosTex() {
 					var r = Math.sqrt(oldPx * oldPx + oldPy * oldPy + oldPz * oldPz);
 					var oneMinus2MOverR = 1 - 2*blackHoleMass/r;			
 					var posDotVel = oldPx * oldVx + oldPy * oldVy + oldPz * oldVz;
-					var posDotVelSq = oldPx * oldVx * oldVx + oldPy * oldVy * oldVy + oldPz * oldVz * oldVz;
+					var velDotVel = oldVx * oldVx + oldVy * oldVy + oldVz * oldVz;
 					var r2 = r * r;
 					var invR2M = 1 / (r * oneMinus2MOverR);
 					var rMinus2MOverR2 = oneMinus2MOverR / r;
 					var MOverR2 = blackHoleMass / r2;
-					newVx = oldVx - dLambda * MOverR2 * (rMinus2MOverR2 * oldPx * oldVt * oldVt + invR2M * (2 * oldVx * posDotVel - posDotVelSq));
-					newVy = oldVy - dLambda * MOverR2 * (rMinus2MOverR2 * oldPy * oldVt * oldVt + invR2M * (2 * oldVy * posDotVel - posDotVelSq));
-					newVz = oldVz - dLambda * MOverR2 * (rMinus2MOverR2 * oldPz * oldVt * oldVt + invR2M * (2 * oldVz * posDotVel - posDotVelSq));
+					newVx = oldVx - dLambda * MOverR2 * (rMinus2MOverR2 * oldPx * oldVt * oldVt + invR2M * (oldPx * velDotVel - 2 * oldVx * posDotVel));
+					newVy = oldVy - dLambda * MOverR2 * (rMinus2MOverR2 * oldPy * oldVt * oldVt + invR2M * (oldPy * velDotVel - 2 * oldVy * posDotVel));
+					newVz = oldVz - dLambda * MOverR2 * (rMinus2MOverR2 * oldPz * oldVt * oldVt + invR2M * (oldPz * velDotVel - 2 * oldVz * posDotVel));
 					newVt = oldVt + dLambda * 2 * MOverR2 * invR2M * posDotVel * oldVt;
 				} else if (objectType == 'Alcubierre Warp Drive Bubble') {
 					var r = Math.sqrt(oldPx * oldPx + oldPy * oldPy + oldPz * oldPz);
