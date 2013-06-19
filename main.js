@@ -67,34 +67,69 @@ function resetField() {
 	}
 	updateInterval = undefined;
 
-	var v3 = vec4.create();
+	var vel = vec4.create();
+	var pos = vec4.create();
 	//lightBuf[side][u][v][x,y,z,w,vx,vy,vz,vw]
 	var i = 0;
 	for (var side = 0; side < 6; ++side) {
 		for (var v = 0; v < lightTexHeight; ++v) {
 			for (var u = 0; u < lightTexWidth; ++u) {
-				v3[0] = (u + .5) / lightTexWidth * 2 - 1;
-				v3[1] = 1 - (v + .5) / lightTexHeight * 2;
-				v3[2] = 1;
-				vec3.transformQuat(v3,v3,angleForSide[side]);
+				vel[0] = (u + .5) / lightTexWidth * 2 - 1;
+				vel[1] = 1 - (v + .5) / lightTexHeight * 2;
+				vel[2] = 1;
+				vec3.transformQuat(vel,vel,angleForSide[side]);
 
 				//[3] will be the time (0'th) coordinate
 				//light velocities must be unit in minkowski space
 				//-vt^2 + vx^2 + vy^2 + vz^2 = -1
 				//vt^2 = vx^2 + vy^2 + vz^2 + 1
-				//v3[3] = Math.sqrt(v3[0] * v3[0] + v3[1] * v3[1] + v3[2] * v3[2] + 1);
+				//vel[3] = Math.sqrt(vel[0] * vel[0] + vel[1] * vel[1] + vel[2] * vel[2] + 1);
 				//this still allows a degree of freedom in the spatial length ... (why is this?)
 				//let's keep it normalized
-				vec3.normalize(v3, v3);
+				vec3.normalize(vel, vel);
+				vec4.copy(pos, vel);
+				pos[3] = 0;
+
+				if (objectType == 'Black Hole') {
+					//when initializing our metric:
+					//g_ab v^a v^b = 0 for our metric g
+					// (-1 + 2M/r) vt^2 + (vx^2 + vy^2 + vz^2) / (1 - 2M/r) = 0
+					// (1 - 2M/r) vt^2 = (vx^2 + vy^2 + vz^2) / (1 - 2M/r)
+					// vt^2 = (vx^2 + vy^2 + vz^2) / (1 - 2M/r)^2
+					// vt = ||vx,vy,vz|| / (1 - 2M/r)
+					var r = vec3.length(pos);
+					var oneMinus2MOverR = 1 - 2*blackHoleMass/r;
+					vel[3] = 1 / oneMinus2MOverR;
+				} else if (objectType == 'Alcubierre Warp Drive Bubble') {
+					//g_ab v^a v^b = 0
+					//... later
+					var r = vec3.length(pos);
+					var sigmaFront = warpBubbleThickness * (r + warpBubbleRadius);
+					var sigmaCenter = warpBubbleThickness * r;
+					var sigmaBack = warpBubbleThickness * (r - warpBubbleRadius);
+					var tanhSigmaCenter = tanh(sigmaCenter);
+					var f = (tanh(sigmaFront) - tanh(sigmaBack)) / (2 * tanhSigmaCenter);
+					var sechDiff = sechSq(sigmaFront) - sechSq(sigmaBack);
+					var dfScalar = sechDiff / (2 * r * tanhSigmaCenter);				
+				
+					var vf = f * warpBubbleVelocity;
+					var vf2 = vf * vf;
+					vel[3] = 
+						(warpBubbleVelocity * f + Math.sqrt(
+							vf2 * (1 + vel[0] * vel[0]) + 1
+						)) / (-1 + vf2);
+				}
 				
 				//position (relative to black hole)
-				lightBuf[i++] = v3[0] - objectDist;
-				lightBuf[i++] = v3[1];
-				lightBuf[i++] = v3[2];
+				lightBuf[i++] = vel[0] - objectDist;
+				lightBuf[i++] = vel[1];
+				lightBuf[i++] = vel[2];
+				lightBuf[i++] = 0;
 				//velocity
-				lightBuf[i++] = v3[0];
-				lightBuf[i++] = v3[1];
-				lightBuf[i++] = v3[2];
+				lightBuf[i++] = vel[0];
+				lightBuf[i++] = vel[1];
+				lightBuf[i++] = vel[2];
+				lightBuf[i++] = 1.;	//technically this 1 should be biased by the metric tensor ... per-phenomena
 			}
 		}
 	}
@@ -107,54 +142,48 @@ function resetField() {
 function updateLightPosTex() {	
 	//var progress = $('#update-progress');
 	//progress.attr('value', 0);
-	var p = vec4.create();
-	var v = vec4.create();
 	updateInterval = asyncfor({
 		start : 0,
 		end : 6,
 		callback : function(side) {
-			var srci = side * lightTexWidth * lightTexHeight * 6;
+			var srci = side * lightTexWidth * lightTexHeight * 8;
 			var dsti = 0;
 			for (var i = 0; i < lightTexWidth * lightTexHeight; ++i) {
 				//read positions and velocities
-				p[0] = lightBuf[srci++];
-				p[1] = lightBuf[srci++];
-				p[2] = lightBuf[srci++];
-				v[0] = lightBuf[srci++];
-				v[1] = lightBuf[srci++];
-				v[2] = lightBuf[srci++];
+				var oldPx = lightBuf[srci+0];
+				var oldPy = lightBuf[srci+1];
+				var oldPz = lightBuf[srci+2];
+				var oldPt = lightBuf[srci+3];
+				var oldVx = lightBuf[srci+4];
+				var oldVy = lightBuf[srci+5];
+				var oldVz = lightBuf[srci+6];
+				var oldVt = lightBuf[srci+7];
 				
-				//update positions by velocities
-				p[0] += v[0] * dLambda;
-				p[1] += v[1] * dLambda;
-				p[2] += v[2] * dLambda;
-			
+				//cache change in positions by velocities
+				var newPx = oldPx + oldVx * dLambda;
+				var newPy = oldPy + oldVy * dLambda;
+				var newPz = oldPz + oldVz * dLambda;
+				var newPt = oldPt + oldVt * dLambda;
+				var newVx, newVy, newVz, newVt;
+				
 				//update velocity by geodesic equation
 				if (objectType == 'Black Hole') {
 					// Schwarzschild Cartesian metric
 					//aux variables:
-					var r = vec3.length(p);
-					var oneMinus2MOverR = 1 - 2*blackHoleMass/r;
-					//g_ab v^a v^b = 0 for our metric g
-					// (-1 + 2M/r) vt^2 + (vx^2 + vy^2 + vz^2) / (1 - 2M/r) = 0
-					// (1 - 2M/r) vt^2 = (vx^2 + vy^2 + vz^2) / (1 - 2M/r)
-					// vt^2 = (vx^2 + vy^2 + vz^2) / (1 - 2M/r)^2
-					// vt = ||vx,vy,vz|| / (1 - 2M/r)
-					var vtSq = vec3.dot(v, v) / (oneMinus2MOverR * oneMinus2MOverR);
-			
-					var posDotVel = p[0] * v[0] + p[1] * v[1] + p[2] * v[2];
-					var posDotVelSq = p[0] * v[0] * v[0] + p[1] * v[1] * v[1] + p[2] * v[2] * v[2];
+					var r = Math.sqrt(oldPx * oldPx + oldPy * oldPy + oldPz * oldPz);
+					var oneMinus2MOverR = 1 - 2*blackHoleMass/r;			
+					var posDotVel = oldPx * oldVx + oldPy * oldVy + oldPz * oldVz;
+					var posDotVelSq = oldPx * oldVx * oldVx + oldPy * oldVy * oldVy + oldPz * oldVz * oldVz;
 					var r2 = r * r;
 					var invR2M = 1 / (r * oneMinus2MOverR);
 					var rMinus2MOverR2 = oneMinus2MOverR / r;
 					var MOverR2 = blackHoleMass / r2;
-					v[0] -= dLambda * MOverR2 * (rMinus2MOverR2 * p[0] * vtSq + invR2M * (2 * v[0] * posDotVel - posDotVelSq));
-					v[1] -= dLambda * MOverR2 * (rMinus2MOverR2 * p[1] * vtSq + invR2M * (2 * v[1] * posDotVel - posDotVelSq));
-					v[2] -= dLambda * MOverR2 * (rMinus2MOverR2 * p[2] * vtSq + invR2M * (2 * v[2] * posDotVel - posDotVelSq));
+					newVx = oldVx - dLambda * MOverR2 * (rMinus2MOverR2 * oldPx * oldVt * oldVt + invR2M * (2 * oldVx * posDotVel - posDotVelSq));
+					newVy = oldVy - dLambda * MOverR2 * (rMinus2MOverR2 * oldPy * oldVt * oldVt + invR2M * (2 * oldVy * posDotVel - posDotVelSq));
+					newVz = oldVz - dLambda * MOverR2 * (rMinus2MOverR2 * oldPz * oldVt * oldVt + invR2M * (2 * oldVz * posDotVel - posDotVelSq));
+					newVt = oldVt + dLambda * 2 * MOverR2 * invR2M * posDotVel * oldVt;
 				} else if (objectType == 'Alcubierre Warp Drive Bubble') {
-					var vt = vec3.length(v);
-					
-					var r = vec3.length(p);
+					var r = Math.sqrt(oldPx * oldPx + oldPy * oldPy + oldPz * oldPz);
 					var sigmaFront = warpBubbleThickness * (r + warpBubbleRadius);
 					var sigmaCenter = warpBubbleThickness * r;
 					var sigmaBack = warpBubbleThickness * (r - warpBubbleRadius);
@@ -162,51 +191,51 @@ function updateLightPosTex() {
 					var f = (tanh(sigmaFront) - tanh(sigmaBack)) / (2 * tanhSigmaCenter);
 					var sechDiff = sechSq(sigmaFront) - sechSq(sigmaBack);
 					var dfScalar = sechDiff / (2 * r * tanhSigmaCenter);
-					var ft = -warpBubbleVelocity * warpBubbleThickness * p[0] * dfScalar;
-					var fx = warpBubbleThickness * p[0] * dfScalar;
-					var fy = warpBubbleThickness * p[1] * dfScalar;
-					var fz = warpBubbleThickness * p[2] * dfScalar;
+					var ft = -warpBubbleVelocity * warpBubbleThickness * oldPx * dfScalar;
+					var fx = warpBubbleThickness * oldPx * dfScalar;
+					var fy = warpBubbleThickness * oldPy * dfScalar;
+					var fz = warpBubbleThickness * oldPz * dfScalar;
 			
 					//if I ever choose to keep track of v^t...
-					//negRelDiff2.w = f * f * fx * warpBubbleVelocity * warpBubbleVelocity * warpBubbleVelocity * vt * vt
-					//	- 2. * f * fx * warpBubbleVelocity * warpBubbleVelocity * vt * v[0]
-					//	- 2. * f * fy * warpBubbleVelocity * warpBubbleVelocity / 2. * vt * v[1]
-					//	- 2. * f * fz * warpBubbleVelocity * warpBubbleVelocity / 2. * vt * v[2]
-					//	+ fx * warpBubbleVelocity * v[0] * v[0]
-					//	+ 2. * fy * warpBubbleVelocity / 2. * v[0] * v[1]
-					//	+ 2. * fz * warpBubbleVelocity / 2. * v[0] * v[2]
-					//;
-					v[0] -= dLambda * ((f * f * f * fx * warpBubbleVelocity * warpBubbleVelocity * warpBubbleVelocity * warpBubbleVelocity - f * fx * warpBubbleVelocity * warpBubbleVelocity - ft * warpBubbleVelocity) * vt * vt
-						- 2. * f * f * fx * warpBubbleVelocity * warpBubbleVelocity * warpBubbleVelocity * vt * v[0]
-						- 2. * (f * f * fy * warpBubbleVelocity * warpBubbleVelocity * warpBubbleVelocity + fy * warpBubbleVelocity) / 2. * vt * v[1]
-						- 2. * (f * f * fz * warpBubbleVelocity * warpBubbleVelocity * warpBubbleVelocity + fz * warpBubbleVelocity) / 2. * vt * v[2]
-						+ f * fx * warpBubbleVelocity * warpBubbleVelocity * v[0] * v[0]
-						+ 2. * f * fy * warpBubbleVelocity * warpBubbleVelocity / 2. * v[0] * v[1]
-						+ 2. * f * fz * warpBubbleVelocity * warpBubbleVelocity / 2. * v[0] * v[2]
+					newVt = oldVt - dLambda * (f * f * fx * warpBubbleVelocity * warpBubbleVelocity * warpBubbleVelocity * oldVt * oldVt
+						- 2. * f * fx * warpBubbleVelocity * warpBubbleVelocity * oldVt * oldVx
+						- 2. * f * fy * warpBubbleVelocity * warpBubbleVelocity / 2. * oldVt * oldVy
+						- 2. * f * fz * warpBubbleVelocity * warpBubbleVelocity / 2. * oldVt * oldVz
+						+ fx * warpBubbleVelocity * oldVx * oldVx
+						+ 2. * fy * warpBubbleVelocity / 2. * oldVx * oldVy
+						+ 2. * fz * warpBubbleVelocity / 2. * oldVx * oldVz
 					);
-					v[1] += dLambda * (f * fy * warpBubbleVelocity * warpBubbleVelocity * vt * vt
-						+ 2. * fy * warpBubbleVelocity / 2. * vt * v[0]
+					newVx = oldVx - dLambda * ((f * f * f * fx * warpBubbleVelocity * warpBubbleVelocity * warpBubbleVelocity * warpBubbleVelocity - f * fx * warpBubbleVelocity * warpBubbleVelocity - ft * warpBubbleVelocity) * oldVt * oldVt
+						- 2. * f * f * fx * warpBubbleVelocity * warpBubbleVelocity * warpBubbleVelocity * oldVt * oldVx
+						- 2. * (f * f * fy * warpBubbleVelocity * warpBubbleVelocity * warpBubbleVelocity + fy * warpBubbleVelocity) / 2. * oldVt * oldVy
+						- 2. * (f * f * fz * warpBubbleVelocity * warpBubbleVelocity * warpBubbleVelocity + fz * warpBubbleVelocity) / 2. * oldVt * oldVz
+						+ f * fx * warpBubbleVelocity * warpBubbleVelocity * oldVx * oldVx
+						+ 2. * f * fy * warpBubbleVelocity * warpBubbleVelocity / 2. * oldVx * oldVy
+						+ 2. * f * fz * warpBubbleVelocity * warpBubbleVelocity / 2. * oldVx * oldVz
 					);
-					v[2] += dLambda * (f * fz * warpBubbleVelocity * warpBubbleVelocity * vt * vt
-						+ 2. * fz * warpBubbleVelocity / 2. * vt * v[0]
+					newVy = oldVy + dLambda * (f * fy * warpBubbleVelocity * warpBubbleVelocity * oldVt * oldVt
+						+ 2. * fy * warpBubbleVelocity / 2. * oldVt * oldVx
+					);
+					newVz = oldVz + dLambda * (f * fz * warpBubbleVelocity * warpBubbleVelocity * oldVt * oldVt
+						+ 2. * fz * warpBubbleVelocity / 2. * oldVt * oldVx
 					);
 				}
 				// write back results
-				srci -= 6;
-				lightBuf[srci++] = p[0];
-				lightBuf[srci++] = p[1];
-				lightBuf[srci++] = p[2];
-				lightBuf[srci++] = v[0];
-				lightBuf[srci++] = v[1];
-				lightBuf[srci++] = v[2];
-				//don't bother update v[3], I don't store it and just reset it afterwards
+				lightBuf[srci++] = newPx;
+				lightBuf[srci++] = newPy;
+				lightBuf[srci++] = newPz;
+				lightBuf[srci++] = newPt;
+				lightBuf[srci++] = newVx;
+				lightBuf[srci++] = newVy;
+				lightBuf[srci++] = newVz;
+				lightBuf[srci++] = newVt;
+				//don't bother update vw, I don't store it and just reset it afterwards
 				//copy floats to uint8 texture
-				var s = vec3.length(v);
-				lightPosTexData[side][dsti++]  = 255 * (v[0] / s * .5 + .5);
-				lightPosTexData[side][dsti++]  = 255 * (v[1] / s * .5 + .5);
-				lightPosTexData[side][dsti++]  = 255 * (v[2] / s * .5 + .5);
+				var s = Math.sqrt(newVx * newVx + newVy * newVy + newVz * newVz);
+				lightPosTexData[side][dsti++]  = 255 * (newVx / s * .5 + .5);
+				lightPosTexData[side][dsti++]  = 255 * (newVy / s * .5 + .5);
+				lightPosTexData[side][dsti++]  = 255 * (newVz / s * .5 + .5);
 			}
-			//progress.attr('value', 100 * (side + 1) / 6);
 		},
 		done : function() {
 			lightPosTex.bind();
@@ -332,7 +361,7 @@ $(document).ready(function(){
 		}
 	});
 
-	lightBuf = new Float32Array(6 * 3 * 2 * lightTexWidth * lightTexHeight);
+	lightBuf = new Float32Array(6 * 4 * 2 * lightTexWidth * lightTexHeight);
 	resetField();
 
 	var cubeShader = new GL.ShaderProgram({
