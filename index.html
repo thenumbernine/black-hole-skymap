@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<title>Black Hole Iterative Skymap - WebGL</title>
+		
+		<script language='javascript' type='text/javascript' src='../js/jquery-1.10.0.min.js'></script>
+		<script language='javascript' type='text/javascript' src='../js/util.js'></script>
+		<script language='javascript' type='text/javascript' src='../js/gl-matrix-min.js'></script>
+		<script language='javascript' type='text/javascript' src='../js/webgl-debug.js'></script>
+		<script language='javascript' type='text/javascript' src='../js/gl-util.js'></script>
+		<script language='javascript' type='text/javascript' src='../js/mouse3d.js'></script>
+		<script language='javascript' type='text/javascript' src='main.js'></script>
+		
+<script type='text/javascript'>
+var _gaq = _gaq || [];
+_gaq.push(['_setAccount', 'UA-17312646-1']);
+_gaq.push(['_trackPageview']);
+(function() {
+	var ga = document.createElement('script'); ga.type = 'text/javascript'; ga.async = true;
+	ga.src = ('https:' == document.location.protocol ? 'https://ssl' : 'http://www') + '.google-analytics.com/ga.js';
+	var s = document.getElementsByTagName('script')[0]; s.parentNode.insertBefore(ga, s);
+})();
+</script>
+
+		<script id='cube-vsh' type='x-shader/x-vertex'>
+attribute vec3 vtx;
+varying vec3 vtxv;
+uniform mat4 mvMat;
+uniform mat4 projMat;
+void main() {
+	vtxv = vtx;
+	gl_Position = projMat * mvMat * vec4(vtx, 1.);
+}
+		</script>
+		<script id='cube-fsh' type='x-shader/x-fragment'>
+precision mediump float;
+varying vec3 vtxv;
+uniform samplerCube skyTex;
+uniform samplerCube lightPosTex;
+
+mat3 rotate(float angle, vec3 axis) {
+	axis = normalize(axis);
+	float s = sin(angle);
+	float c = cos(angle);
+	float oc = 1.0 - c;
+			
+	return mat3(
+		oc * axis.x * axis.x + c,           oc * axis.x * axis.y - axis.z * s,  oc * axis.z * axis.x + axis.y * s,
+		oc * axis.x * axis.y + axis.z * s,  oc * axis.y * axis.y + c,           oc * axis.y * axis.z - axis.x * s,
+		oc * axis.z * axis.x - axis.y * s,  oc * axis.y * axis.z + axis.x * s,  oc * axis.z * axis.z + c);
+}
+
+void main() {
+	vec3 dir = textureCube(lightPosTex, vtxv).xyz * 2. - 1.;
+	gl_FragColor = textureCube(skyTex, dir);
+	gl_FragColor.w = 1.; 
+}
+		</script>
+
+		<style type='text/css'>
+
+body {
+	background-color:black;
+	color:white;
+}
+
+a:link {
+	cursor:pointer;
+	color:#00FFFF;
+}
+
+a:visited {
+	cursor:pointer;
+	color:#00FFFF;
+}
+
+a:hover {
+	cursor:pointer;
+	color:#00FFFF;
+}
+
+a:active {
+	cursor:pointer;
+	color:#00FFFF;
+}
+	
+		</style>
+	</head>
+	<body style='margin:0px; overflow:hidden'>
+		<div id='panel' style='width:400px; position:absolute; background-color:rgba(0,0,0,.25)'>
+			<select id='objectTypes'></select><br>
+			Object Distance (m): <input id='objectDist'/><br>
+			Black Hole Mass (kg): <input id='blackHoleMass'/><br>
+			Warp Bubble Thickness: <input id='warpBubbleThickness'/><br>
+			Warp Bubble Velocity (c): <input id='warpBubbleVelocity'/><br>
+			Warp Bubble Radius: <input id='warpBubbleRadius'/><br>
+			<button id='reset'>Reset</button><br>
+			<!-- button id='pause'>Pause</button><br -->
+			<!-- Update: <progress id='update-progress' max='100' value='0'></progress><br> -->
+		</div>
+		<div id='webglfail' style='display:none'>
+			Sorry, your browser does not support WebGL<br>
+			Try one of these other, better browsers:<br>
+			<a href='http://www.google.com/chrome'>Chrome</a><br>
+			<a href='http://www.mozilla.org/firefox'>Firefox</a><br>
+			<a href='http://www.apple.com/safari'>Safari</a><br>
+			<b>Opera Users:</b><br>
+			Enter "opera:config" in the address bar.<br>
+			In the "User Prefs" section set both "Enable Hardware Acceleration" and "Enable WebGL" to "1" and then click "Save".<br>
+			It is still buggy.<br>
+			<b>IE Users:</b><br>
+			Sorry guys, IE doesn't plan to support WebGL.<br>
+			Consider using a more <a href='http://www.w3schools.com/browsers/browsers_stats.asp'>standard compliant</a> browser.<br>
+		</div>
+	</body>
+</html>
