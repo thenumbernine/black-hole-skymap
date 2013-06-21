@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<title>Black Hole Iterative Skymap - WebGL</title>
+
+		<meta charset='UTF-8'>
+		<script type='text/javascript' src='../js/jquery-1.10.0.min.js'></script>
+		<script type='text/javascript' src='../js/util.js'></script>
+		<script type='text/javascript' src='../js/gl-matrix-min.js'></script>
+		<script type='text/javascript' src='../js/webgl-debug.js'></script>
+		<script type='text/javascript' src='../js/gl-util.js'></script>
+		<script type='text/javascript' src='../js/gl-util-pingpong.js'></script>
+		<script type='text/javascript' src='../js/mouse3d.js'></script>
+		<script type='text/javascript' src='main.fbo.js'></script>
+		
+<script type='text/javascript'>
+var _gaq = _gaq || [];
+_gaq.push(['_setAccount', 'UA-17312646-1']);
+_gaq.push(['_trackPageview']);
+(function() {
+	var ga = document.createElement('script'); ga.type = 'text/javascript'; ga.async = true;
+	ga.src = ('https:' == document.location.protocol ? 'https://ssl' : 'http://www') + '.google-analytics.com/ga.js';
+	var s = document.getElementsByTagName('script')[0]; s.parentNode.insertBefore(ga, s);
+})();
+</script>
+		<script id='shader-common' type='x-shader/x-fragment'>
+float tanh(float x) {
+	float exp2x = exp(2. * x);
+	return (exp2x - 1.) / (exp2x + 1.);
+}
+
+float sech(float x) {
+	float expx = exp(x);
+	return 2. * expx / (expx * expx + 1.);
+}
+
+float sechSq(float x) {
+	float y = sech(x);
+	return y * y;
+}
+
+//http://stackoverflow.com/questions/9882716/packing-float-into-vec4-how-does-this-code-work
+//this typically runs over a range of 0-1
+//I'm changing it to -MAX/2,MAX/2
+#define FIXED_MAX	16.
+vec4 floatToFixed(float v)
+{
+	//v = clamp(v, -.5 * FIXED_MAX, .5 * FIXED_MAX);
+	v = v / FIXED_MAX + .5;
+	const vec4 bit_shift = vec4(256.0*256.0*256.0, 256.0*256.0, 256.0, 1.0);
+	const vec4 bit_mask  = vec4(0.0, 1.0/256.0, 1.0/256.0, 1.0/256.0);
+	vec4 res = fract(v * bit_shift);
+	res -= res.xxyz * bit_mask;
+	return res;
+}
+float fixedToFloat(vec4 c)
+{
+	const vec4 bit_shift = vec4(1.0/(256.0*256.0*256.0), 1.0/(256.0*256.0), 1.0/256.0, 1.0);
+	float v = dot(c, bit_shift);
+	v = (v - .5) * FIXED_MAX;
+	return v;
+}
+		</script>
+		<script id='cube-vsh' type='x-shader/x-vertex'>
+attribute vec2 vtx;
+varying vec2 uv;
+varying vec3 vtxv;
+uniform mat4 mvMat;
+uniform mat4 projMat;
+void main() {
+	uv = vtx;
+	vec3 objVtx = vec3(vtx * 2. - 1., 1.);
+	vec4 vtx4 = mvMat * vec4(objVtx, 1.);
+	vtxv = objVtx;
+	gl_Position = projMat * vtx4;
+}
+		</script>
+		<script id='cube-fsh' type='x-shader/x-fragment'>
+varying vec2 uv;
+varying vec3 vtxv;
+uniform samplerCube skyTex;
+uniform sampler2D lightVelXTex;
+uniform sampler2D lightVelYTex;
+uniform sampler2D lightVelZTex;
+uniform mat3 rotMat3;
+
+void main() {
+	/* can't verify just yet * /
+	vec3 dir;
+	vec4 reg;
+	reg = texture2D(lightVelXTex, uv);
+	dir.x = fixedToFloat(reg);
+	reg = texture2D(lightVelYTex, uv);
+	dir.y = fixedToFloat(reg);
+	reg = texture2D(lightVelZTex, uv);
+	dir.z = fixedToFloat(reg);
+	dir.w = 0.;
+	dir = rotMat3 * dir;
+	gl_FragColor = textureCube(skyTex, dir);
+	/**/	
+
+	/* testing the buffers to a unit color cubemap - not just yet */
+	gl_FragColor.x = .5 + .5 * fixedToFloat(texture2D(lightVelXTex, uv));
+	gl_FragColor.y = .5 + .5 * fixedToFloat(texture2D(lightVelYTex, uv));
+	gl_FragColor.z = .5 + .5 * fixedToFloat(texture2D(lightVelZTex, uv));
+	gl_FragColor.w = 1.;
+	/**/
+
+	/* testing fixed to float to and from - just keep max at 16 - check* /
+	vec3 dir = vtxv; 
+	dir = rotMat3 * dir;
+	dir.x = fixedToFloat(floatToFixed(dir.x));
+	dir.y = fixedToFloat(floatToFixed(dir.y));
+	dir.z = fixedToFloat(floatToFixed(dir.z));
+	gl_FragColor = vec4(dir.xyz * .5 + .5, 1.); 
+	/**/
+
+	/* cubemap - works* /
+	vec3 dir = vtxv; 
+	dir = rotMat3 * dir;
+	gl_FragColor = textureCube(skyTex, dir.xyz);
+	/**/	
+	
+	gl_FragColor.w = 1.; 
+}
+		</script>
+		<script id='Black_Hole:Alcubierre_Warp_Drive_Bubble:reset:pos:vel:x:y:z:t:vsh' type='x-shader/x-vertex'>
+attribute vec2 vtx;
+varying vec3 vtxv;
+uniform mat3 rotation;
+void main() {
+	//warning: might have to flip the y, we're doing that in software...
+	vtxv = rotation * vec3(vtx * 2. - 1., 1.);
+	gl_Position = vec4(vtx * 2. - 1., 0., 1.);
+}
+		</script>
+		<script id='Black_Hole:Alcubierre_Warp_Drive_Bubble:reset:pos:x:fsh' type='x-shader/x-fragment'>
+varying vec3 vtxv;
+uniform float objectCenter;
+void main() {
+	vec3 dir = normalize(vtxv);
+	gl_FragColor = floatToFixed(dir.x - objectCenter);
+}
+		</script>
+		<script id='Black_Hole:Alcubierre_Warp_Drive_Bubble:reset:vel:x:fsh' type='x-shader/x-fragment'>
+varying vec3 vtxv;
+uniform float objectCenter;
+void main() {
+	vec3 dir = normalize(vtxv);
+	gl_FragColor = floatToFixed(dir.x);
+}
+		</script>
+		<script id='Black_Hole:Alcubierre_Warp_Drive_Bubble:reset:pos:vel:y:fsh' type='x-shader/x-fragment'>
+varying vec3 vtxv;
+void main() {
+	vec3 dir = normalize(vtxv);
+	gl_FragColor = floatToFixed(dir.y);
+}
+		</script>
+		<script id='Black_Hole:Alcubierre_Warp_Drive_Bubble:reset:pos:vel:z:fsh' type='x-shader/x-fragment'>
+varying vec3 vtxv;
+void main() {
+	vec3 dir = normalize(vtxv);
+	gl_FragColor = floatToFixed(dir.z);
+}
+		</script>
+		<script id='Black_Hole:Alcubierre_Warp_Drive_Bubble:reset:pos:t:fsh' type='x-shader/x-fragment'>
+varying vec3 vtxv;
+void main() {
+	gl_FragColor = floatToFixed(0.);
+}
+		</script>	
+		<script id='Black_Hole:reset:vel:t:fsh' type='x-shader/x-fragment'>
+//when initializing our metric:
+//g_ab v^a v^b = 0 for our metric g
+// (-1 + 2M/r) vt^2 + (vx^2 + vy^2 + vz^2) / (1 - 2M/r) = 0
+// (1 - 2M/r) vt^2 = (vx^2 + vy^2 + vz^2) / (1 - 2M/r)
+// vt^2 = (vx^2 + vy^2 + vz^2) / (1 - 2M/r)^2
+// vt = ||vx,vy,vz|| / (1 - 2M/r)
+varying vec3 vtxv;
+uniform float blackHoleMass;
+void main() {
+	vec3 vel = normalize(vtxv);
+	float r = length(vel);
+	float oneMinus2MOverR = 1. - 2. * blackHoleMass / r;
+	float vt = 1. / oneMinus2MOverR;
+	gl_FragColor = floatToFixed(vt);
+}
+		</script>
+		<script id='Alcubierre_Warp_Drive_Bubble:reset:vel:t:fsh' type='x-shader/x-fragment'>
+varying vec3 vtxv;
+uniform float objectCenter;
+uniform float warpBubbleThickness;
+uniform float warpBubbleVelocity;
+uniform float warpBubbleRadius;
+void main() {
+	vec3 vel = normalize(vtxv);
+	vec3 pos = vel;
+	pos.x -= objectCenter;
+	float r = length(pos);
+	float sigmaFront = warpBubbleThickness * (r + warpBubbleRadius);
+	float sigmaCenter = warpBubbleThickness * r;
+	float sigmaBack = warpBubbleThickness * (r - warpBubbleRadius);
+	float tanhSigmaCenter = tanh(sigmaCenter);
+	float f = (tanh(sigmaFront) - tanh(sigmaBack)) / (2. * tanhSigmaCenter);
+	float sechDiff = sechSq(sigmaFront) - sechSq(sigmaBack);
+	float dfScalar = sechDiff / (2. * r * tanhSigmaCenter);				
+	float vf = f * warpBubbleVelocity;
+	float vf2 = vf * vf;
+	float vt = 
+		(warpBubbleVelocity * f + sqrt(
+			vf2 * (1. + vel.x * vel.x) + 1.
+		)) / (-1. + vf2);
+	gl_FragColor = floatToFixed(vt);
+}
+		</script>
+	
+		<style type='text/css'>
+
+body {
+	background-color:black;
+	color:white;
+}
+
+a:link {
+	cursor:pointer;
+	color:#00FFFF;
+}
+
+a:visited {
+	cursor:pointer;
+	color:#00FFFF;
+}
+
+a:hover {
+	cursor:pointer;
+	color:#00FFFF;
+}
+
+a:active {
+	cursor:pointer;
+	color:#00FFFF;
+}
+	
+		</style>
+	</head>
+	<body style='margin:0px; overflow:hidden'>
+		<div id='panel' style='width:400px; position:absolute; background-color:rgba(0,0,0,.25)'>
+			<select id='objectTypes'></select><br>
+			Iteration d/dLambda: <input id='deltaLambda'/><br>
+			Object Distance (m): <input id='objectDist'/><br>
+			Black Hole Mass (kg): <input id='blackHoleMass'/><br>
+			Warp Bubble Thickness: <input id='warpBubbleThickness'/><br>
+			Warp Bubble Velocity (c): <input id='warpBubbleVelocity'/><br>
+			Warp Bubble Radius: <input id='warpBubbleRadius'/><br>
+			<button id='reset'>Reset</button><br>
+			<!-- button id='pause'>Pause</button><br -->
+			<!-- Update: <progress id='update-progress' max='100' value='0'></progress><br> -->
+		</div>
+		<div id='webglfail' style='display:none'>
+			Sorry, your browser does not support WebGL<br>
+			Try one of these other, better browsers:<br>
+			<a href='http://www.google.com/chrome'>Chrome</a><br>
+			<a href='http://www.mozilla.org/firefox'>Firefox</a><br>
+			<a href='http://www.apple.com/safari'>Safari</a><br>
+			<b>Opera Users:</b><br>
+			Enter "opera:config" in the address bar.<br>
+			In the "User Prefs" section set both "Enable Hardware Acceleration" and "Enable WebGL" to "1" and then click "Save".<br>
+			It is still buggy.<br>
+			<b>IE Users:</b><br>
+			Sorry guys, IE doesn't plan to support WebGL.<br>
+			Consider using a more <a href='http://www.w3schools.com/browsers/browsers_stats.asp'>standard compliant</a> browser.<br>
+		</div>
+	</body>
+</html>

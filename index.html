@@ -38,18 +38,6 @@ varying vec3 vtxv;
 uniform samplerCube skyTex;
 uniform samplerCube lightPosTex;
 
-mat3 rotate(float angle, vec3 axis) {
-	axis = normalize(axis);
-	float s = sin(angle);
-	float c = cos(angle);
-	float oc = 1.0 - c;
-			
-	return mat3(
-		oc * axis.x * axis.x + c,           oc * axis.x * axis.y - axis.z * s,  oc * axis.z * axis.x + axis.y * s,
-		oc * axis.x * axis.y + axis.z * s,  oc * axis.y * axis.y + c,           oc * axis.y * axis.z - axis.x * s,
-		oc * axis.z * axis.x - axis.y * s,  oc * axis.y * axis.z + axis.x * s,  oc * axis.z * axis.z + c);
-}
-
 void main() {
 	vec3 dir = textureCube(lightPosTex, vtxv).xyz * 2. - 1.;
 	gl_FragColor = textureCube(skyTex, dir);
@@ -89,6 +77,7 @@ a:active {
 	<body style='margin:0px; overflow:hidden'>
 		<div id='panel' style='width:400px; position:absolute; background-color:rgba(0,0,0,.25)'>
 			<select id='objectTypes'></select><br>
+			Iteration d/dLambda: <input id='deltaLambda'/><br>
 			Object Distance (m): <input id='objectDist'/><br>
 			Black Hole Mass (kg): <input id='blackHoleMass'/><br>
 			Warp Bubble Thickness: <input id='warpBubbleThickness'/><br>

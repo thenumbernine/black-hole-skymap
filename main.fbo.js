@@ -8,7 +8,7 @@ I could encode a cubemap as rgb => xyz, keep it normalized, and iterate through 
 var canvas;
 var gl;
 var mouse;
-var cubeObj;
+var cubeSides;
 var objectTypes = ['Black Hole', 'Alcubierre Warp Drive Bubble'];
 var objectType = objectTypes[0];
 var objectDist = 10;
@@ -23,26 +23,75 @@ var updateInterval = undefined;
 //...or do some sort of adaptive thing ...
 var lightTexWidth = 256;
 var lightTexHeight = 256;
-var lightBuf; 
-var lightPosTexData = [];
-for (var side = 0; side < 6; ++side) {
-	lightPosTexData[side] = new Uint8Array(3 * lightTexWidth * lightTexHeight);
-}
-var lightPosTex; 
 
-function tanh(x) {
-	var exp2x = Math.exp(2 * x);
-	return (exp2x - 1) / (exp2x + 1);
+var ident4 = mat4.create();
+mat4.identity(ident4);
+
+/*
+flags: flags used to find what shader to associate with this
+	they are combined with each object type and put in 'shaders'
+	from that, shaders[objectType] determines the shader to run
+*/
+var shaderTypes = ['reset'];
+var lightPosVelChannels = [
+	{flags:['pos', 'x']},
+	{flags:['pos', 'y']},
+	{flags:['pos', 'z']},
+	{flags:['pos', 't']},
+	{flags:['vel', 'x']},
+	{flags:['vel', 'y']},
+	{flags:['vel', 'z']},
+	{flags:['vel', 't']},
+];
+var unitQuadVertexBuffer;
+var fboQuad;
+
+function getScriptForFlags(flags) {
+	flags = flags.clone();
+	for (var i = 0; i < flags.length; ++i) {
+		flags[i] = flags[i].replace(new RegExp(' ', 'g'), '_');
+	}
+	var code = '';
+	$('script').each(function(index) {
+		var id = $(this).attr('id');
+		if (id === undefined) return;	//continue;
+		var parts = id.split(':');
+		//if all flags are found in parts then use this shader
+		//multiple concatenations? maybe later
+		var failed = false;
+		$.each(flags, function(_,flag) {
+			if (parts.indexOf(flag) == -1) {
+				failed = true;
+				return false;	//break;
+			}
+		});
+		if (failed) {
+			return;	//continue;
+		}
+		
+		var text = $(this).text();
+		code += text; 
+		return false;	//break;
+	});
+	if (code == '') throw "couldn't find code for flags "+flags.join(':');
+	return code;
 }
 
-function sech(x) {
-	var expx = Math.exp(x);
-	return 2. * expx / (expx * expx + 1.);
-}
+function buildShaderForFlags(flags) {
+	var vshFlags = flags.clone();
+	vshFlags.push('vsh');
+	var vertexCode = getScriptForFlags(vshFlags);
+	
+	var fshFlags = flags.clone();
+	fshFlags.push('fsh');
+	var fragmentCode = getScriptForFlags(fshFlags);
 
-function sechSq(x) {
-	var y = sech(x);
-	return y * y;
+	fragmentCode = 'precision mediump float;\n' + $('#shader-common').text() + fragmentCode;
+
+	return new GL.ShaderProgram({
+		vertexCode : vertexCode,
+		fragmentCode : fragmentCode
+	});
 }
 
 var SQRT_1_2 = Math.sqrt(.5);
@@ -61,79 +110,43 @@ function resize() {
 	GL.resize();
 }
 
+
 function resetField() {
 	if (updateInterval !== undefined) {
 		clearInterval(updateInterval); 
 	}
 	updateInterval = undefined;
 
-	var vel = vec4.create();
-	var pos = vec4.create();
-	//lightBuf[side][u][v][x,y,z,w,vx,vy,vz,vw]
-	var i = 0;
-	for (var side = 0; side < 6; ++side) {
-		for (var v = 0; v < lightTexHeight; ++v) {
-			for (var u = 0; u < lightTexWidth; ++u) {
-				vel[0] = (u + .5) / lightTexWidth * 2 - 1;
-				vel[1] = 1 - (v + .5) / lightTexHeight * 2;
-				vel[2] = 1;
-				vec3.transformQuat(vel,vel,angleForSide[side]);
-
-				//[3] will be the time (0'th) coordinate
-				//light velocities must be unit in minkowski space
-				//-vt^2 + vx^2 + vy^2 + vz^2 = -1
-				//vt^2 = vx^2 + vy^2 + vz^2 + 1
-				//vel[3] = Math.sqrt(vel[0] * vel[0] + vel[1] * vel[1] + vel[2] * vel[2] + 1);
-				//this still allows a degree of freedom in the spatial length ... (why is this?)
-				//let's keep it normalized
-				vec3.normalize(vel, vel);
-				vec4.copy(pos, vel);
-				pos[3] = 0;
-
-				if (objectType == 'Black Hole') {
-					//when initializing our metric:
-					//g_ab v^a v^b = 0 for our metric g
-					// (-1 + 2M/r) vt^2 + (vx^2 + vy^2 + vz^2) / (1 - 2M/r) = 0
-					// (1 - 2M/r) vt^2 = (vx^2 + vy^2 + vz^2) / (1 - 2M/r)
-					// vt^2 = (vx^2 + vy^2 + vz^2) / (1 - 2M/r)^2
-					// vt = ||vx,vy,vz|| / (1 - 2M/r)
-					var r = vec3.length(pos);
-					var oneMinus2MOverR = 1 - 2*blackHoleMass/r;
-					vel[3] = 1 / oneMinus2MOverR;
-				} else if (objectType == 'Alcubierre Warp Drive Bubble') {
-					//g_ab v^a v^b = 0
-					//... later
-					var r = vec3.length(pos);
-					var sigmaFront = warpBubbleThickness * (r + warpBubbleRadius);
-					var sigmaCenter = warpBubbleThickness * r;
-					var sigmaBack = warpBubbleThickness * (r - warpBubbleRadius);
-					var tanhSigmaCenter = tanh(sigmaCenter);
-					var f = (tanh(sigmaFront) - tanh(sigmaBack)) / (2 * tanhSigmaCenter);
-					var sechDiff = sechSq(sigmaFront) - sechSq(sigmaBack);
-					var dfScalar = sechDiff / (2 * r * tanhSigmaCenter);				
-				
-					var vf = f * warpBubbleVelocity;
-					var vf2 = vf * vf;
-					vel[3] = 
-						(warpBubbleVelocity * f + Math.sqrt(
-							vf2 * (1 + vel[0] * vel[0]) + 1
-						)) / (-1 + vf2);
+	var rotationMat3 = mat3.create();
+	gl.viewport(0, 0, lightTexWidth, lightTexHeight);
+	$.each(lightPosVelChannels, function(_,channel) {
+		for (var side = 0; side < 6; ++side) {
+			var shader = channel.shaders[objectType].reset;
+			
+			var uniforms = {};
+			if (channel.uniforms !== undefined) {
+				for (var i = 0; i < channel.uniforms.length; ++i) {
+					var uniformName = channel.uniforms[i];
+					uniforms[uniformName] = window[uniformName];
 				}
-				
-				//position (relative to black hole)
-				lightBuf[i++] = vel[0] - objectDist;
-				lightBuf[i++] = vel[1];
-				lightBuf[i++] = vel[2];
-				lightBuf[i++] = 0;
-				//velocity
-				lightBuf[i++] = vel[0];
-				lightBuf[i++] = vel[1];
-				lightBuf[i++] = vel[2];
-				lightBuf[i++] = vel[3]; 
 			}
+			mat3.fromQuat(rotationMat3, angleForSide[side]);
+			uniforms.rotation = rotationMat3;
+			
+			var fbo = channel.fbos[0][side];
+			fbo.draw({
+				callback:function(){
+					fboQuad.draw({
+						shader:shader,
+						uniforms:uniforms
+					});
+				}
+			});
 		}
-	}
-	updateLightPosTex();
+	});
+	gl.viewport(0, 0, GL.canvas.width, GL.canvas.height);
+
+	//updateLightPosTex();
 }
 
 
@@ -255,6 +268,12 @@ function updateLightPosTex() {
 
 var tmpRotMat = mat4.create();	
 function update() {
+	for (var side = 0; side < 6; ++side) {
+		//texs[0] is skyTex
+		cubeSides[side].texs[1] = lightPosVelChannels[4].texs[0][side];
+		cubeSides[side].texs[2] = lightPosVelChannels[5].texs[0][side];
+		cubeSides[side].texs[3] = lightPosVelChannels[6].texs[0][side];
+	}
 	GL.draw();
 	requestAnimFrame(update);
 };
@@ -318,7 +337,9 @@ $(document).ready(function(){
 		$('#webglfail').show();
 		throw e;
 	}
-	
+
+	gl.disable(gl.DITHER);
+
 	GL.view.zNear = .1;
 	GL.view.zFar = 100;
 	GL.view.fovY = 45;
@@ -346,65 +367,125 @@ $(document).ready(function(){
 			'skytex/sky-infrared-cube-zn.png'
 		]
 	});
-	
-	lightPosTex = new GL.TextureCube({
-		internalFormat : gl.RGB,
-		format : gl.RGB,
-		type : gl.UNSIGNED_BYTE,
-		width : lightTexWidth,
-		height : lightTexHeight,
-		data : lightPosTexData[side],
-		magFilter : gl.LINEAR,
-		minFilter : gl.NEAREST,
-		wrap : {
-			s : gl.CLAMP_TO_EDGE,
-			t : gl.CLAMP_TO_EDGE
+
+	$.each(lightPosVelChannels, function(_,channel) {
+		channel.texs = [];
+		channel.fbos = [];
+		for (var history = 0; history < 2; ++history) {
+			var texs = [];
+			channel.texs[history] = texs;
+			var fbos = [];
+			channel.fbos[history] = fbos;
+			for (var side = 0; side < 6; ++side) {
+				var tex = new GL.Texture2D({
+					internalFormat : gl.RGBA,
+					format : gl.RGBA,
+					type : gl.UNSIGNED_BYTE,
+					width : lightTexWidth,
+					height : lightTexHeight,
+					magFilter : gl.LINEAR,
+					minFilter : gl.NEAREST,
+					wrap : {
+						s : gl.CLAMP_TO_EDGE,
+						t : gl.CLAMP_TO_EDGE
+					}
+				});
+				texs[side] = tex;
+				
+				var fbo = new GL.Framebuffer();
+				gl.bindFramebuffer(gl.FRAMEBUFFER, fbo.obj);
+				gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, tex.obj, 0);
+				gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+				fbos[side] = fbo;
+			}
 		}
+		
+		channel.shaders = {};
+		$.each(objectTypes, function(_,objType) {
+			var flags = channel.flags.clone();
+			flags.push(objType);
+			channel.shaders[objType] = {};
+			$.each(shaderTypes, function(_,shaderType) {
+				var shflags = flags.clone();
+				shflags.push(shaderType);
+				channel.shaders[objType][shaderType] = buildShaderForFlags(shflags);
+			});
+		});
 	});
 
-	lightBuf = new Float32Array(6 * 4 * 2 * lightTexWidth * lightTexHeight);
-	resetField();
+	unitQuadVertexBuffer = new GL.ArrayBuffer({
+		dim : 2,
+		data : [0, 0, 1, 0, 0, 1, 1, 1]
+	});
 
+	//used for off-screen rendering and not part of the scene graph
+	fboQuad = new GL.SceneObject({
+		mode : gl.TRIANGLE_STRIP,
+		vertexBuffer : unitQuadVertexBuffer,
+		uniforms : {
+			projMat : ident4,
+			mvMat : ident4 
+		},
+		parent : null
+	});	
+	
 	var cubeShader = new GL.ShaderProgram({
 		vertexCodeID : 'cube-vsh',
-		fragmentCodeID : 'cube-fsh',
+		fragmentCode : 
+			'precision mediump float;\n'
+			+ $('#shader-common').text()
+			+ $('#cube-fsh').text(),
 		uniforms : {
 			skyTex : 0,
-			lightPosTex : 1,
+			lightVelXTex : 1,
+			lightVelYTex : 2,
+			lightVelZTex : 3
 		}
 	});
 
-	var cubeVtxArray = new Float32Array(3*8);
-	for (var i = 0; i < 8; i++) {
-		cubeVtxArray[0+3*i] = 2*(i&1)-1;
-		cubeVtxArray[1+3*i] = 2*((i>>1)&1)-1;
-		cubeVtxArray[2+3*i] = 2*((i>>2)&1)-1;
+
+	//scene graph, 6 quads oriented in a cube
+	//I would use a cubemap but the Mali-400 doesn't seem to want to use them as 2D FBO targets ...
+	cubeSides = [];
+	for (var side = 0; side < 6; ++side) {
+		var angle = angleForSide[side];
+		var m3 = mat3.create();
+		mat3.fromQuat(m3, angle);
+		//negative z is forward
+		var v3 = vec3.create();
+		v3[0] = -.5 * m3[6];
+		v3[1] = -.5 * m3[7];
+		v3[2] = -.5 * m3[8];
+
+		cubeSides[side] = new GL.SceneObject({
+			mode : gl.TRIANGLE_STRIP,
+			vertexBuffer : unitQuadVertexBuffer,
+			shader : cubeShader,
+			uniforms : {
+				rotMat3 : m3 
+			},
+			//angle : angle, 
+			//pos : v3,
+			//here's a breaking point of the current structure:
+			//for static objects, the scene graph "optimizes" and uses the parent if no transformation information is provided
+			//for non-static objects, the mvMat member is recomputed each draw
+			//... what if we want a member mat that is modified in ways other than those recomputed ?  like scale?
+			//  currently no dice.
+			//texs will look like [skyTex, lightPosVelChannels[4, 5, and 6].texs[0][side]],
+			// but those textures are ever-changing and will need to be updated each frame
+			texs : [skyTex],
+			angle : angleForSide[side],
+		});
+		
+		//...fixing the above mentioned problem...
+		//cubeSides[side].uniforms.projMat = GL.projMat;
+		//var mvMat = mat4.create();
+		//mat4.fromQuat(mvMat, angleForSide[side]);
+		//cubeSides[side].uniforms.mvMat = mvMat;
+		//for some reason i can't access the same uniform from within my vertex and fragment shader ...
+		//cubeSides[side].uniforms.mvMat2 = mvMat;
 	}
 
-	cubeVtxBuf = new GL.ArrayBuffer({
-		data : cubeVtxArray 
-	});
-
-	var cubeIndexBuf = new GL.ElementArrayBuffer({
-		data : [
-			5,7,3,3,1,5,		// <- each value has the x,y,z in the 0,1,2 bits (off = 0, on = 1)
-			6,4,0,0,2,6,
-			2,3,7,7,6,2,
-			4,5,1,1,0,4,
-			6,7,5,5,4,6,
-			0,1,3,3,2,0
-		]
-	});
-
-	cubeObj = new GL.SceneObject({
-		mode : gl.TRIANGLES,
-		vertexBuffer : cubeVtxBuf,
-		indexBuffer : cubeIndexBuf,
-		shader : cubeShader,
-		texs : [skyTex, lightPosTex],
-		static : false
-	});
-	
 	var tmpQ = quat.create();	
 	mouse = new Mouse3D({
 		pressObj : canvas,
@@ -421,6 +502,8 @@ $(document).ready(function(){
 			GL.updateProjection();
 		}
 	});
+	
+	resetField();
 
 	$(window).resize(resize);
 	resize();
