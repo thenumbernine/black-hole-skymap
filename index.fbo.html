@@ -85,42 +85,11 @@ uniform sampler2D lightVelZTex;
 uniform mat3 rotMat3;
 
 void main() {
-	/* can't verify just yet * /
 	vec3 dir;
-	vec4 reg;
-	reg = texture2D(lightVelXTex, uv);
-	dir.x = fixedToFloat(reg);
-	reg = texture2D(lightVelYTex, uv);
-	dir.y = fixedToFloat(reg);
-	reg = texture2D(lightVelZTex, uv);
-	dir.z = fixedToFloat(reg);
-	dir.w = 0.;
-	dir = rotMat3 * dir;
-	gl_FragColor = textureCube(skyTex, dir);
-	/**/	
-
-	/* testing the buffers to a unit color cubemap - not just yet */
-	gl_FragColor.x = .5 + .5 * fixedToFloat(texture2D(lightVelXTex, uv));
-	gl_FragColor.y = .5 + .5 * fixedToFloat(texture2D(lightVelYTex, uv));
-	gl_FragColor.z = .5 + .5 * fixedToFloat(texture2D(lightVelZTex, uv));
-	gl_FragColor.w = 1.;
-	/**/
-
-	/* testing fixed to float to and from - just keep max at 16 - check* /
-	vec3 dir = vtxv; 
-	dir = rotMat3 * dir;
-	dir.x = fixedToFloat(floatToFixed(dir.x));
-	dir.y = fixedToFloat(floatToFixed(dir.y));
-	dir.z = fixedToFloat(floatToFixed(dir.z));
-	gl_FragColor = vec4(dir.xyz * .5 + .5, 1.); 
-	/**/
-
-	/* cubemap - works* /
-	vec3 dir = vtxv; 
-	dir = rotMat3 * dir;
-	gl_FragColor = textureCube(skyTex, dir.xyz);
-	/**/	
-	
+	dir.x = fixedToFloat(texture2D(lightVelXTex, uv));
+	dir.y = fixedToFloat(texture2D(lightVelYTex, uv));
+	dir.z = fixedToFloat(texture2D(lightVelZTex, uv));
+	gl_FragColor.xyz = textureCube(skyTex, dir).xyz;
 	gl_FragColor.w = 1.; 
 }
 		</script>
@@ -129,7 +98,6 @@ attribute vec2 vtx;
 varying vec3 vtxv;
 uniform mat3 rotation;
 void main() {
-	//warning: might have to flip the y, we're doing that in software...
 	vtxv = rotation * vec3(vtx * 2. - 1., 1.);
 	gl_Position = vec4(vtx * 2. - 1., 0., 1.);
 }
