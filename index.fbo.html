@@ -39,58 +39,65 @@ float sechSq(float x) {
 	return y * y;
 }
 
+#ifdef USE_TEXTURE_FLOAT
+vec4 floatToFixed(float v) { return vec4(v, 0., 0., 1.); }
+vec4 fixedToFloat(vec4 c) { return c.x; }
+#else
 //http://stackoverflow.com/questions/9882716/packing-float-into-vec4-how-does-this-code-work
 //this typically runs over a range of 0-1
 //I'm changing it to -MAX/2,MAX/2
 #define FIXED_MAX	16.
-vec4 floatToFixed(float v)
-{
-	//v = clamp(v, -.5 * FIXED_MAX, .5 * FIXED_MAX);
+vec4 floatToFixed(float v) {
 	v = v / FIXED_MAX + .5;
+	//v = clamp(v, 0., 1.);
 	const vec4 bit_shift = vec4(256.0*256.0*256.0, 256.0*256.0, 256.0, 1.0);
 	const vec4 bit_mask  = vec4(0.0, 1.0/256.0, 1.0/256.0, 1.0/256.0);
 	vec4 res = fract(v * bit_shift);
 	res -= res.xxyz * bit_mask;
 	return res;
 }
-float fixedToFloat(vec4 c)
-{
+
+float fixedToFloat(vec4 c) {
 	const vec4 bit_shift = vec4(1.0/(256.0*256.0*256.0), 1.0/(256.0*256.0), 1.0/256.0, 1.0);
 	float v = dot(c, bit_shift);
 	v = (v - .5) * FIXED_MAX;
 	return v;
 }
+#endif
 		</script>
 		<script id='cube-vsh' type='x-shader/x-vertex'>
 attribute vec2 vtx;
 varying vec2 uv;
-varying vec3 vtxv;
 uniform mat4 mvMat;
 uniform mat4 projMat;
 void main() {
 	uv = vtx;
-	vec3 objVtx = vec3(vtx * 2. - 1., 1.);
-	vec4 vtx4 = mvMat * vec4(objVtx, 1.);
-	vtxv = objVtx;
+	vec4 vtx4 = mvMat * vec4(vtx * 2. - 1., 1., 1.);
 	gl_Position = projMat * vtx4;
 }
 		</script>
 		<script id='cube-fsh' type='x-shader/x-fragment'>
 varying vec2 uv;
-varying vec3 vtxv;
 uniform samplerCube skyTex;
 uniform sampler2D lightVelXTex;
 uniform sampler2D lightVelYTex;
 uniform sampler2D lightVelZTex;
-uniform mat3 rotMat3;
 
 void main() {
 	vec3 dir;
+	/* works */
 	dir.x = fixedToFloat(texture2D(lightVelXTex, uv));
 	dir.y = fixedToFloat(texture2D(lightVelYTex, uv));
 	dir.z = fixedToFloat(texture2D(lightVelZTex, uv));
 	gl_FragColor.xyz = textureCube(skyTex, dir).xyz;
 	gl_FragColor.w = 1.; 
+	/**/
+	/* debugging * /
+	gl_FragColor.x = fixedToFloat(texture2D(lightVelXTex, uv));
+	gl_FragColor.y = fixedToFloat(texture2D(lightVelYTex, uv));
+	gl_FragColor.z = fixedToFloat(texture2D(lightVelZTex, uv));
+	gl_FragColor.w = 1.; 
+	/**/
 }
 		</script>
 		<script id='Black_Hole:Alcubierre_Warp_Drive_Bubble:reset:pos:vel:x:y:z:t:vsh' type='x-shader/x-vertex'>
@@ -182,9 +189,151 @@ void main() {
 	gl_FragColor = floatToFixed(vt);
 }
 		</script>
-	
+		<script id='Black_Hole:Alcubierre_Warp_Drive_Bubble:iterate:pos:vel:x:y:z:t:vsh' type='x-shader/x-vertex'>
+attribute vec2 vtx;
+varying vec2 uv;
+varying vec3 vtxv;
+uniform mat4 projMat;
+uniform mat3 rotation;
+void main() {
+	uv = vtx;
+	vtxv = rotation * vec3(vtx * 2. - 1., 1.);
+	gl_Position = projMat * vec4(vtx, 0., 1.);
+}
+		</script>
+		<script id='Black_Hole:Alcubierre_Warp_Drive_Bubble:iterate:pos:vel:x:y:z:t:fsh' type='x-shader/x-fragment'>
+varying vec2 uv;
+varying vec3 vtxv;
+uniform float deltaLambda;
+uniform float objectCenter;
+uniform sampler2D lightPosXTex;
+uniform sampler2D lightPosYTex;
+uniform sampler2D lightPosZTex;
+uniform sampler2D lightPosTTex;
+uniform sampler2D lightVelXTex;
+uniform sampler2D lightVelYTex;
+uniform sampler2D lightVelZTex;
+uniform sampler2D lightVelTTex;
+		</script>
+		<script id='Black_Hole:iterate:vel:x:y:z:t:fsh' type='x-shader/x-fragment'>
+uniform float blackHoleMass;
+		</script>
+		<script id='Alcubierre_Warp_Drive_Bubble:iterate:vel:x:y:z:t:fsh' type='x-shader/x-fragment'>
+uniform float warpBubbleThickness;
+uniform float warpBubbleRadius;
+uniform float warpBubbleVelocity;
+		</script>
+		<script id='Black_Hole:Alcubierre_Warp_Drive_Bubble:iterate:pos:vel:x:y:z:t:fsh' type='x-shader/x-fragment'>
+void main() {
+	vec4 pos;
+	pos.x = fixedToFloat(texture2D(lightPosXTex, uv));
+	pos.y = fixedToFloat(texture2D(lightPosYTex, uv));
+	pos.z = fixedToFloat(texture2D(lightPosZTex, uv));
+	pos.w = fixedToFloat(texture2D(lightPosTTex, uv));
+	vec4 vel;
+	vel.x = fixedToFloat(texture2D(lightVelXTex, uv));
+	vel.y = fixedToFloat(texture2D(lightVelYTex, uv));
+	vel.z = fixedToFloat(texture2D(lightVelZTex, uv));
+	vel.w = fixedToFloat(texture2D(lightVelTTex, uv));
+		</script>
+		<script id='Black_Hole:Alcubierre_Warp_Drive_Bubble:iterate:pos:x:fsh' type='x-shader/x-fragment'>
+	gl_FragColor = floatToFixed(pos.x + deltaLambda * vel.x);
+}
+		</script>
+		<script id='Black_Hole:Alcubierre_Warp_Drive_Bubble:iterate:pos:y:fsh' type='x-shader/x-fragment'>
+	gl_FragColor = floatToFixed(pos.y + deltaLambda * vel.y);
+}
+		</script>
+		<script id='Black_Hole:Alcubierre_Warp_Drive_Bubble:iterate:pos:z:fsh' type='x-shader/x-fragment'>
+	gl_FragColor = floatToFixed(pos.z + deltaLambda * vel.z);
+}
+		</script>
+		<script id='Black_Hole:Alcubierre_Warp_Drive_Bubble:iterate:pos:t:fsh' type='x-shader/x-fragment'>
+	gl_FragColor = floatToFixed(pos.w + deltaLambda * vel.w);
+}
+		</script>
+		<script id='Black_Hole:iterate:vel:x:y:z:t:fsh' type='x-shader/x-fragment'>
+	float r = length(pos.xyz);
+	float oneMinus2MOverR = 1. - 2.*blackHoleMass/r;			
+	float posDotVel = dot(pos.xyz, vel.xyz);
+	float velDotVel = dot(vel.xyz, vel.xyz);
+	float r2 = r * r;
+	float invR2M = 1. / (r * oneMinus2MOverR);
+	float rMinus2MOverR2 = oneMinus2MOverR / r;
+	float MOverR2 = blackHoleMass / r2;
+		</script>
+		<script id='Black_Hole:iterate:vel:x:fsh' type='x-shader/x-fragment'>
+	float newVelX = vel.x - deltaLambda * MOverR2 * (rMinus2MOverR2 * pos.x * vel.w * vel.w + invR2M * (pos.x * velDotVel - 2. * vel.x * posDotVel));
+	gl_FragColor = floatToFixed(newVelX);
+}
+		</script>
+		<script id='Black_Hole:iterate:vel:y:fsh' type='x-shader/x-fragment'>
+	float newVelY = vel.y - deltaLambda * MOverR2 * (rMinus2MOverR2 * pos.y * vel.w * vel.w + invR2M * (pos.y * velDotVel - 2. * vel.y * posDotVel));
+	gl_FragColor = floatToFixed(newVelY);
+}
+		</script>
+		<script id='Black_Hole:iterate:vel:z:fsh' type='x-shader/x-fragment'>
+	float newVelZ = vel.z - deltaLambda * MOverR2 * (rMinus2MOverR2 * pos.z * vel.w * vel.w + invR2M * (pos.z * velDotVel - 2. * vel.z * posDotVel));
+	gl_FragColor = floatToFixed(newVelZ);
+}
+		</script>
+		<script id='Black_Hole:iterate:vel:t:fsh' type='x-shader/x-fragment'>
+	float newVelT = vel.w + deltaLambda * 2. * MOverR2 * invR2M * posDotVel * vel.w;
+	gl_FragColor = floatToFixed(newVelT);
+}
+		</script>
+		<script id='Alcubierre_Warp_Drive_Bubble:iterate:vel:x:y:z:t:fsh' type='x-shader/x-fragment'>
+	float r = length(pos.xyz);
+	float sigmaFront = warpBubbleThickness * (r + warpBubbleRadius);
+	float sigmaCenter = warpBubbleThickness * r;
+	float sigmaBack = warpBubbleThickness * (r - warpBubbleRadius);
+	float tanhSigmaCenter = tanh(sigmaCenter);
+	float f = (tanh(sigmaFront) - tanh(sigmaBack)) / (2. * tanhSigmaCenter);
+	float sechDiff = sechSq(sigmaFront) - sechSq(sigmaBack);
+	float dfScalar = sechDiff / (2. * r * tanhSigmaCenter);
+	vec4 fv;
+	fv.xyz = warpBubbleThickness * pos.xyz * dfScalar;
+	fv.t = -warpBubbleVelocity * warpBubbleThickness * pos.x * dfScalar;
+		</script>
+		<script id='Alcubierre_Warp_Drive_Bubble:iterate:vel:x:fsh' type='x-shader/x-fragment'>
+	float newVelX = vel.x - deltaLambda * ((f * f * f * fv.x * warpBubbleVelocity * warpBubbleVelocity * warpBubbleVelocity * warpBubbleVelocity - f * fv.x * warpBubbleVelocity * warpBubbleVelocity - fv.t * warpBubbleVelocity) * vel.t * vel.t
+		- 2. * f * f * fv.x * warpBubbleVelocity * warpBubbleVelocity * warpBubbleVelocity * vel.t * vel.x
+		- 2. * (f * f * fv.y * warpBubbleVelocity * warpBubbleVelocity * warpBubbleVelocity + fv.y * warpBubbleVelocity) / 2. * vel.t * vel.y
+		- 2. * (f * f * fv.z * warpBubbleVelocity * warpBubbleVelocity * warpBubbleVelocity + fv.z * warpBubbleVelocity) / 2. * vel.t * vel.z
+		+ f * fv.x * warpBubbleVelocity * warpBubbleVelocity * vel.x * vel.x
+		+ 2. * f * fv.y * warpBubbleVelocity * warpBubbleVelocity / 2. * vel.x * vel.y
+		+ 2. * f * fv.z * warpBubbleVelocity * warpBubbleVelocity / 2. * vel.x * vel.z
+	);
+	gl_FragColor = floatToFixed(newVelX);
+}
+		</script>
+		<script id='Alcubierre_Warp_Drive_Bubble:iterate:vel:y:fsh' type='x-shader/x-fragment'>
+	float newVelY = vel.y + deltaLambda * (f * fv.y * warpBubbleVelocity * warpBubbleVelocity * vel.t * vel.t
+		+ 2. * fv.y * warpBubbleVelocity / 2. * vel.t * vel.x
+	);
+	gl_FragColor = floatToFixed(newVelY);
+}
+		</script>
+		<script id='Alcubierre_Warp_Drive_Bubble:iterate:vel:z:fsh' type='x-shader/x-fragment'>
+	float newVelZ = vel.z + deltaLambda * (f * fv.z * warpBubbleVelocity * warpBubbleVelocity * vel.t * vel.t
+		+ 2. * fv.z * warpBubbleVelocity / 2. * vel.t * vel.x
+	);
+	gl_FragColor = floatToFixed(newVelZ);
+}
+		</script>
+		<script id='Alcubierre_Warp_Drive_Bubble:iterate:vel:t:fsh' type='x-shader/x-fragment'>
+	float newVelT = vel.t - deltaLambda * (f * f * fv.x * warpBubbleVelocity * warpBubbleVelocity * warpBubbleVelocity * vel.t * vel.t
+		- 2. * f * fv.x * warpBubbleVelocity * warpBubbleVelocity * vel.t * vel.x
+		- 2. * f * fv.y * warpBubbleVelocity * warpBubbleVelocity / 2. * vel.t * vel.y
+		- 2. * f * fv.z * warpBubbleVelocity * warpBubbleVelocity / 2. * vel.t * vel.z
+		+ fv.x * warpBubbleVelocity * vel.x * vel.x
+		+ 2. * fv.y * warpBubbleVelocity / 2. * vel.x * vel.y
+		+ 2. * fv.z * warpBubbleVelocity / 2. * vel.x * vel.z
+	);
+	gl_FragColor = floatToFixed(newVelT);
+}
+		</script>
 		<style type='text/css'>
-
 body {
 	background-color:black;
 	color:white;

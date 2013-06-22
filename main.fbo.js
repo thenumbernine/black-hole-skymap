@@ -17,22 +17,18 @@ var warpBubbleThickness = 1;
 var warpBubbleVelocity = .5;
 var warpBubbleRadius = 2;
 var deltaLambda = .1;	//ray forward iteration
-var updateInterval = undefined; 
-//I'm updating in software, so on my tablet 512 is a bit slow
-//if I stop iteration after reaching a steady state, maybe I'll up resolution then
-//...or do some sort of adaptive thing ...
 var lightTexWidth = 256;
 var lightTexHeight = 256;
 
-var ident4 = mat4.create();
-mat4.identity(ident4);
+var unitOrthoProjMat = mat4.create();
+mat4.ortho(unitOrthoProjMat, 0, 1, 0, 1, -1, 1);
 
 /*
 flags: flags used to find what shader to associate with this
 	they are combined with each object type and put in 'shaders'
 	from that, shaders[objectType] determines the shader to run
 */
-var shaderTypes = ['reset'];
+var shaderTypes = ['reset', 'iterate'];
 var lightPosVelChannels = [
 	{flags:['pos', 'x']},
 	{flags:['pos', 'y']},
@@ -45,6 +41,13 @@ var lightPosVelChannels = [
 ];
 var unitQuadVertexBuffer;
 var fboQuad;
+
+function stupidPrint(s) {
+	return;
+	$.each(s.split('\n'), function(_,l) {
+		console.log(l);
+	});
+}
 
 function getScriptForFlags(flags) {
 	flags = flags.clone();
@@ -68,12 +71,13 @@ function getScriptForFlags(flags) {
 		if (failed) {
 			return;	//continue;
 		}
-		
 		var text = $(this).text();
+		stupidPrint('adding '+text);
 		code += text; 
-		return false;	//break;
+		//return false;	//break;
 	});
 	if (code == '') throw "couldn't find code for flags "+flags.join(':');
+	stupidPrint('building '+flags.join(':')+' and getting '+code);
 	return code;
 }
 
@@ -90,7 +94,9 @@ function buildShaderForFlags(flags) {
 
 	return new GL.ShaderProgram({
 		vertexCode : vertexCode,
-		fragmentCode : fragmentCode
+		fragmentCode : 
+			(useFloatTextures ? '#define USE_FLOAT_TEXTURE\n' : '')
+			+ fragmentCode
 	});
 }
 
@@ -111,13 +117,8 @@ function resize() {
 }
 
 
+var rotationMat3 = mat3.create();
 function resetField() {
-	if (updateInterval !== undefined) {
-		clearInterval(updateInterval); 
-	}
-	updateInterval = undefined;
-
-	var rotationMat3 = mat3.create();
 	gl.viewport(0, 0, lightTexWidth, lightTexHeight);
 	$.each(lightPosVelChannels, function(_,channel) {
 		for (var side = 0; side < 6; ++side) {
@@ -145,139 +146,83 @@ function resetField() {
 		}
 	});
 	gl.viewport(0, 0, GL.canvas.width, GL.canvas.height);
-
-	//updateLightPosTex();
 }
 
 
 //update the uint8 array from the float array
 //then upload the uint8 array to the gpu
 function updateLightPosTex() {	
-	//var progress = $('#update-progress');
-	//progress.attr('value', 0);
-	updateInterval = asyncfor({
-		start : 0,
-		end : 6,
-		callback : function(side) {
-			var srci = side * lightTexWidth * lightTexHeight * 8;
-			var dsti = 0;
-			for (var i = 0; i < lightTexWidth * lightTexHeight; ++i) {
-				//read positions and velocities
-				var oldPx = lightBuf[srci+0];
-				var oldPy = lightBuf[srci+1];
-				var oldPz = lightBuf[srci+2];
-				var oldPt = lightBuf[srci+3];
-				var oldVx = lightBuf[srci+4];
-				var oldVy = lightBuf[srci+5];
-				var oldVz = lightBuf[srci+6];
-				var oldVt = lightBuf[srci+7];
-				
-				//cache change in positions by velocities
-				var newPx = oldPx + oldVx * deltaLambda;
-				var newPy = oldPy + oldVy * deltaLambda;
-				var newPz = oldPz + oldVz * deltaLambda;
-				var newPt = oldPt + oldVt * deltaLambda;
-				var newVx, newVy, newVz, newVt;
-				
-				//update velocity by geodesic equation
-				if (objectType == 'Black Hole') {
-					// Schwarzschild Cartesian metric
-					//aux variables:
-					var r = Math.sqrt(oldPx * oldPx + oldPy * oldPy + oldPz * oldPz);
-					var oneMinus2MOverR = 1 - 2*blackHoleMass/r;			
-					var posDotVel = oldPx * oldVx + oldPy * oldVy + oldPz * oldVz;
-					var velDotVel = oldVx * oldVx + oldVy * oldVy + oldVz * oldVz;
-					var r2 = r * r;
-					var invR2M = 1 / (r * oneMinus2MOverR);
-					var rMinus2MOverR2 = oneMinus2MOverR / r;
-					var MOverR2 = blackHoleMass / r2;
-					newVx = oldVx - deltaLambda * MOverR2 * (rMinus2MOverR2 * oldPx * oldVt * oldVt + invR2M * (oldPx * velDotVel - 2 * oldVx * posDotVel));
-					newVy = oldVy - deltaLambda * MOverR2 * (rMinus2MOverR2 * oldPy * oldVt * oldVt + invR2M * (oldPy * velDotVel - 2 * oldVy * posDotVel));
-					newVz = oldVz - deltaLambda * MOverR2 * (rMinus2MOverR2 * oldPz * oldVt * oldVt + invR2M * (oldPz * velDotVel - 2 * oldVz * posDotVel));
-					newVt = oldVt + deltaLambda * 2 * MOverR2 * invR2M * posDotVel * oldVt;
-				} else if (objectType == 'Alcubierre Warp Drive Bubble') {
-					var r = Math.sqrt(oldPx * oldPx + oldPy * oldPy + oldPz * oldPz);
-					var sigmaFront = warpBubbleThickness * (r + warpBubbleRadius);
-					var sigmaCenter = warpBubbleThickness * r;
-					var sigmaBack = warpBubbleThickness * (r - warpBubbleRadius);
-					var tanhSigmaCenter = tanh(sigmaCenter);
-					var f = (tanh(sigmaFront) - tanh(sigmaBack)) / (2 * tanhSigmaCenter);
-					var sechDiff = sechSq(sigmaFront) - sechSq(sigmaBack);
-					var dfScalar = sechDiff / (2 * r * tanhSigmaCenter);
-					var ft = -warpBubbleVelocity * warpBubbleThickness * oldPx * dfScalar;
-					var fx = warpBubbleThickness * oldPx * dfScalar;
-					var fy = warpBubbleThickness * oldPy * dfScalar;
-					var fz = warpBubbleThickness * oldPz * dfScalar;
+	gl.viewport(0, 0, lightTexWidth, lightTexHeight);
+	$.each(lightPosVelChannels, function(_,channel) {
+		for (var side = 0; side < 6; ++side) {
+			var shader = channel.shaders[objectType].iterate;
 			
-					//if I ever choose to keep track of v^t...
-					newVt = oldVt - deltaLambda * (f * f * fx * warpBubbleVelocity * warpBubbleVelocity * warpBubbleVelocity * oldVt * oldVt
-						- 2. * f * fx * warpBubbleVelocity * warpBubbleVelocity * oldVt * oldVx
-						- 2. * f * fy * warpBubbleVelocity * warpBubbleVelocity / 2. * oldVt * oldVy
-						- 2. * f * fz * warpBubbleVelocity * warpBubbleVelocity / 2. * oldVt * oldVz
-						+ fx * warpBubbleVelocity * oldVx * oldVx
-						+ 2. * fy * warpBubbleVelocity / 2. * oldVx * oldVy
-						+ 2. * fz * warpBubbleVelocity / 2. * oldVx * oldVz
-					);
-					newVx = oldVx - deltaLambda * ((f * f * f * fx * warpBubbleVelocity * warpBubbleVelocity * warpBubbleVelocity * warpBubbleVelocity - f * fx * warpBubbleVelocity * warpBubbleVelocity - ft * warpBubbleVelocity) * oldVt * oldVt
-						- 2. * f * f * fx * warpBubbleVelocity * warpBubbleVelocity * warpBubbleVelocity * oldVt * oldVx
-						- 2. * (f * f * fy * warpBubbleVelocity * warpBubbleVelocity * warpBubbleVelocity + fy * warpBubbleVelocity) / 2. * oldVt * oldVy
-						- 2. * (f * f * fz * warpBubbleVelocity * warpBubbleVelocity * warpBubbleVelocity + fz * warpBubbleVelocity) / 2. * oldVt * oldVz
-						+ f * fx * warpBubbleVelocity * warpBubbleVelocity * oldVx * oldVx
-						+ 2. * f * fy * warpBubbleVelocity * warpBubbleVelocity / 2. * oldVx * oldVy
-						+ 2. * f * fz * warpBubbleVelocity * warpBubbleVelocity / 2. * oldVx * oldVz
-					);
-					newVy = oldVy + deltaLambda * (f * fy * warpBubbleVelocity * warpBubbleVelocity * oldVt * oldVt
-						+ 2. * fy * warpBubbleVelocity / 2. * oldVt * oldVx
-					);
-					newVz = oldVz + deltaLambda * (f * fz * warpBubbleVelocity * warpBubbleVelocity * oldVt * oldVt
-						+ 2. * fz * warpBubbleVelocity / 2. * oldVt * oldVx
-					);
+			var uniforms = {};
+			if (channel.uniforms !== undefined) {
+				for (var i = 0; i < channel.uniforms.length; ++i) {
+					var uniformName = channel.uniforms[i];
+					uniforms[uniformName] = window[uniformName];
 				}
-				// write back results
-				lightBuf[srci++] = newPx;
-				lightBuf[srci++] = newPy;
-				lightBuf[srci++] = newPz;
-				lightBuf[srci++] = newPt;
-				lightBuf[srci++] = newVx;
-				lightBuf[srci++] = newVy;
-				lightBuf[srci++] = newVz;
-				lightBuf[srci++] = newVt;
-				//don't bother update vw, I don't store it and just reset it afterwards
-				//copy floats to uint8 texture
-				var s = Math.sqrt(newVx * newVx + newVy * newVy + newVz * newVz);
-				lightPosTexData[side][dsti++]  = 255 * (newVx / s * .5 + .5);
-				lightPosTexData[side][dsti++]  = 255 * (newVy / s * .5 + .5);
-				lightPosTexData[side][dsti++]  = 255 * (newVz / s * .5 + .5);
 			}
-		},
-		done : function() {
-			lightPosTex.bind();
-			for (var side = 0; side < 6; ++side) {
-				assertEquals(lightTexWidth * lightTexHeight * 3, lightPosTexData[side].length); 
-				//gl.texSubImage2D(gl.TEXTURE_CUBE_MAP_POSITIVE_X + side, 0, 0, 0, lightTexWidth, lightTexHeight, gl.RGB, gl.UNSIGNED_BYTE, lightPosTexData[side]);
-				gl.texImage2D(gl.TEXTURE_CUBE_MAP_POSITIVE_X + side, 0, gl.RGB, lightTexWidth, lightTexHeight, 0, gl.RGB, gl.UNSIGNED_BYTE, lightPosTexData[side]);
-			}
-			lightPosTex.unbind();		
+			mat3.fromQuat(rotationMat3, angleForSide[side]);
+			uniforms.rotation = rotationMat3;
+			uniforms.lightPosXTex = 0;
+			uniforms.lightPosYTex = 1;
+			uniforms.lightPosZTex = 2;
+			uniforms.lightPosTTex = 3;
+			uniforms.lightVelXTex = 4;
+			uniforms.lightVelYTex = 5;
+			uniforms.lightVelZTex = 6;
+			uniforms.lightVelTTex = 7;
 			
-			updateLightPosTex();	
+			var fbo = channel.fbos[1][side];
+			fbo.draw({
+				callback:function(){
+					fboQuad.draw({
+						shader:shader,
+						uniforms:uniforms,
+						texs:[
+							lightPosVelChannels[0].texs[0][side],
+							lightPosVelChannels[1].texs[0][side],
+							lightPosVelChannels[2].texs[0][side],
+							lightPosVelChannels[3].texs[0][side],
+							lightPosVelChannels[4].texs[0][side],
+							lightPosVelChannels[5].texs[0][side],
+							lightPosVelChannels[6].texs[0][side],
+							lightPosVelChannels[7].texs[0][side]
+						]
+					});
+				}
+			});
 		}
+	});
+	gl.viewport(0, 0, GL.canvas.width, GL.canvas.height);
+	$.each(lightPosVelChannels, function(_,channel) {
+		var tmp;
+		tmp = channel.texs[0];
+		channel.texs[0] = channel.texs[1];
+		channel.texs[1] = tmp;
+		tmp = channel.fbos[0];
+		channel.fbos[0] = channel.fbos[1];
+		channel.fbos[1] = tmp;
 	});
 }
 
 // render loop
 
-var tmpRotMat = mat4.create();	
 function update() {
+	//updateLightPosTex();
 	for (var side = 0; side < 6; ++side) {
 		//texs[0] is skyTex
 		cubeSides[side].texs[1] = lightPosVelChannels[4].texs[0][side];
 		cubeSides[side].texs[2] = lightPosVelChannels[5].texs[0][side];
 		cubeSides[side].texs[3] = lightPosVelChannels[6].texs[0][side];
 	}
-	GL.draw();
+	GL.draw();	
 	requestAnimFrame(update);
 };
 
+var useFloatTextures = false; 
 $(document).ready(function(){
 	panel = $('#panel');	
 	canvas = $('<canvas>', {
@@ -337,6 +282,8 @@ $(document).ready(function(){
 		$('#webglfail').show();
 		throw e;
 	}
+	
+	useFloatTextures = gl.getExtension('OES_texture_float');
 
 	gl.disable(gl.DITHER);
 
@@ -355,8 +302,8 @@ $(document).ready(function(){
 		magFilter : gl.LINEAR,
 		minFilter : gl.NEAREST,
 		wrap : {
-			s : gl.CLAMP_TO_EDGE,
-			t : gl.CLAMP_TO_EDGE
+			//s : gl.CLAMP_TO_EDGE,
+			//t : gl.CLAMP_TO_EDGE
 		},
 		urls : [
 			'skytex/sky-infrared-cube-xp.png',
@@ -369,6 +316,9 @@ $(document).ready(function(){
 	});
 
 	$.each(lightPosVelChannels, function(_,channel) {
+		//working on how to organize this
+		channel.uniforms = ['blackHoleMass', 'warpDriveThickness', 'warpDriveRadius', 'warpDriveVelocity', 'objectDist', 'deltaLambda'];
+		
 		channel.texs = [];
 		channel.fbos = [];
 		for (var history = 0; history < 2; ++history) {
@@ -383,11 +333,11 @@ $(document).ready(function(){
 					type : gl.UNSIGNED_BYTE,
 					width : lightTexWidth,
 					height : lightTexHeight,
-					magFilter : gl.LINEAR,
+					magFilter : gl.NEAREST,
 					minFilter : gl.NEAREST,
 					wrap : {
-						s : gl.CLAMP_TO_EDGE,
-						t : gl.CLAMP_TO_EDGE
+						//s : gl.CLAMP_TO_EDGE,
+						//t : gl.CLAMP_TO_EDGE
 					}
 				});
 				texs[side] = tex;
@@ -423,8 +373,7 @@ $(document).ready(function(){
 		mode : gl.TRIANGLE_STRIP,
 		vertexBuffer : unitQuadVertexBuffer,
 		uniforms : {
-			projMat : ident4,
-			mvMat : ident4 
+			projMat : unitOrthoProjMat
 		},
 		parent : null
 	});	
@@ -432,7 +381,8 @@ $(document).ready(function(){
 	var cubeShader = new GL.ShaderProgram({
 		vertexCodeID : 'cube-vsh',
 		fragmentCode : 
-			'precision mediump float;\n'
+			(useFloatTextures ? '#define USE_FLOAT_TEXTURE\n' : '')
+			+ 'precision mediump float;\n'
 			+ $('#shader-common').text()
 			+ $('#cube-fsh').text(),
 		uniforms : {
@@ -461,29 +411,9 @@ $(document).ready(function(){
 			mode : gl.TRIANGLE_STRIP,
 			vertexBuffer : unitQuadVertexBuffer,
 			shader : cubeShader,
-			uniforms : {
-				rotMat3 : m3 
-			},
-			//angle : angle, 
-			//pos : v3,
-			//here's a breaking point of the current structure:
-			//for static objects, the scene graph "optimizes" and uses the parent if no transformation information is provided
-			//for non-static objects, the mvMat member is recomputed each draw
-			//... what if we want a member mat that is modified in ways other than those recomputed ?  like scale?
-			//  currently no dice.
-			//texs will look like [skyTex, lightPosVelChannels[4, 5, and 6].texs[0][side]],
-			// but those textures are ever-changing and will need to be updated each frame
 			texs : [skyTex],
-			angle : angleForSide[side],
+			angle : angleForSide[side]
 		});
-		
-		//...fixing the above mentioned problem...
-		//cubeSides[side].uniforms.projMat = GL.projMat;
-		//var mvMat = mat4.create();
-		//mat4.fromQuat(mvMat, angleForSide[side]);
-		//cubeSides[side].uniforms.mvMat = mvMat;
-		//for some reason i can't access the same uniform from within my vertex and fragment shader ...
-		//cubeSides[side].uniforms.mvMat2 = mvMat;
 	}
 
 	var tmpQ = quat.create();	
