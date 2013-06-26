@@ -20,8 +20,7 @@ var deltaLambda = .1;	//ray forward iteration
 var lightTexWidth = 256;
 var lightTexHeight = 256;
 
-var unitOrthoProjMat = mat4.create();
-mat4.ortho(unitOrthoProjMat, 0, 1, 0, 1, -1, 1);
+var ident4 = mat4.create();
 
 /*
 flags: flags used to find what shader to associate with this
@@ -95,7 +94,7 @@ function buildShaderForFlags(flags) {
 	return new GL.ShaderProgram({
 		vertexCode : vertexCode,
 		fragmentCode : 
-			(useFloatTextures ? '#define USE_FLOAT_TEXTURE\n' : '')
+			(useFloatTextures ? '#define USE_TEXTURE_FLOAT\n' : '')
 			+ fragmentCode
 	});
 }
@@ -209,15 +208,33 @@ function updateLightPosTex() {
 }
 
 // render loop
-
 function update() {
-	//updateLightPosTex();
+	updateLightPosTex();
+	
+	//turn on magnification filter
+	for (var j = 4; j <= 6; ++j) {
+		lightPosVelChannels[j].texs[0][side]
+			.bind()
+			.setArgs({magFilter:gl.LINEAR})
+			.unbind();
+	}
+	
 	for (var side = 0; side < 6; ++side) {
 		//texs[0] is skyTex
 		cubeSides[side].texs[1] = lightPosVelChannels[4].texs[0][side];
 		cubeSides[side].texs[2] = lightPosVelChannels[5].texs[0][side];
 		cubeSides[side].texs[3] = lightPosVelChannels[6].texs[0][side];
 	}
+
+	//turn off magnification filter
+	for (var j = 4; j <= 6; ++j) {
+		lightPosVelChannels[j].texs[0][side]
+			.bind()
+			.setArgs({magFilter:gl.NEAREST})
+			.unbind();
+	}
+	
+	
 	GL.draw();	
 	requestAnimFrame(update);
 };
@@ -302,8 +319,8 @@ $(document).ready(function(){
 		magFilter : gl.LINEAR,
 		minFilter : gl.NEAREST,
 		wrap : {
-			//s : gl.CLAMP_TO_EDGE,
-			//t : gl.CLAMP_TO_EDGE
+			s : gl.CLAMP_TO_EDGE,
+			t : gl.CLAMP_TO_EDGE
 		},
 		urls : [
 			'skytex/sky-infrared-cube-xp.png',
@@ -330,14 +347,14 @@ $(document).ready(function(){
 				var tex = new GL.Texture2D({
 					internalFormat : gl.RGBA,
 					format : gl.RGBA,
-					type : gl.UNSIGNED_BYTE,
+					type : useFloatTextures ? gl.FLOAT : gl.UNSIGNED_BYTE,
 					width : lightTexWidth,
 					height : lightTexHeight,
 					magFilter : gl.NEAREST,
 					minFilter : gl.NEAREST,
 					wrap : {
-						//s : gl.CLAMP_TO_EDGE,
-						//t : gl.CLAMP_TO_EDGE
+						s : gl.CLAMP_TO_EDGE,
+						t : gl.CLAMP_TO_EDGE
 					}
 				});
 				texs[side] = tex;
@@ -372,16 +389,13 @@ $(document).ready(function(){
 	fboQuad = new GL.SceneObject({
 		mode : gl.TRIANGLE_STRIP,
 		vertexBuffer : unitQuadVertexBuffer,
-		uniforms : {
-			projMat : unitOrthoProjMat
-		},
 		parent : null
 	});	
 	
 	var cubeShader = new GL.ShaderProgram({
 		vertexCodeID : 'cube-vsh',
 		fragmentCode : 
-			(useFloatTextures ? '#define USE_FLOAT_TEXTURE\n' : '')
+			(useFloatTextures ? '#define USE_TEXTURE_FLOAT\n' : '')
 			+ 'precision mediump float;\n'
 			+ $('#shader-common').text()
 			+ $('#cube-fsh').text(),
@@ -398,15 +412,6 @@ $(document).ready(function(){
 	//I would use a cubemap but the Mali-400 doesn't seem to want to use them as 2D FBO targets ...
 	cubeSides = [];
 	for (var side = 0; side < 6; ++side) {
-		var angle = angleForSide[side];
-		var m3 = mat3.create();
-		mat3.fromQuat(m3, angle);
-		//negative z is forward
-		var v3 = vec3.create();
-		v3[0] = -.5 * m3[6];
-		v3[1] = -.5 * m3[7];
-		v3[2] = -.5 * m3[8];
-
 		cubeSides[side] = new GL.SceneObject({
 			mode : gl.TRIANGLE_STRIP,
 			vertexBuffer : unitQuadVertexBuffer,

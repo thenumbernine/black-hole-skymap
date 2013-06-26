@@ -41,27 +41,38 @@ float sechSq(float x) {
 
 #ifdef USE_TEXTURE_FLOAT
 vec4 floatToFixed(float v) { return vec4(v, 0., 0., 1.); }
-vec4 fixedToFloat(vec4 c) { return c.x; }
-#else
+float fixedToFloat(vec4 c) { return c.x; }
+#elif 1
 //http://stackoverflow.com/questions/9882716/packing-float-into-vec4-how-does-this-code-work
 //this typically runs over a range of 0-1
 //I'm changing it to -MAX/2,MAX/2
 #define FIXED_MAX	16.
+#define FIXED_SCALE 	32.	//256.
 vec4 floatToFixed(float v) {
 	v = v / FIXED_MAX + .5;
-	//v = clamp(v, 0., 1.);
-	const vec4 bit_shift = vec4(256.0*256.0*256.0, 256.0*256.0, 256.0, 1.0);
-	const vec4 bit_mask  = vec4(0.0, 1.0/256.0, 1.0/256.0, 1.0/256.0);
+	const vec4 bit_shift = vec4(FIXED_SCALE*FIXED_SCALE*FIXED_SCALE, FIXED_SCALE*FIXED_SCALE, FIXED_SCALE, 1.0);
+	const vec4 bit_mask  = vec4(0.0, 1.0/FIXED_SCALE, 1.0/FIXED_SCALE, 1.0/FIXED_SCALE);
 	vec4 res = fract(v * bit_shift);
 	res -= res.xxyz * bit_mask;
 	return res;
 }
 
 float fixedToFloat(vec4 c) {
-	const vec4 bit_shift = vec4(1.0/(256.0*256.0*256.0), 1.0/(256.0*256.0), 1.0/256.0, 1.0);
+	const vec4 bit_shift = vec4(1.0/(FIXED_SCALE*FIXED_SCALE*FIXED_SCALE), 1.0/(FIXED_SCALE*FIXED_SCALE), 1.0/FIXED_SCALE, 1.0);
 	float v = dot(c, bit_shift);
 	v = (v - .5) * FIXED_MAX;
 	return v;
+}
+#else
+vec4 floatToFixed(float v) {
+	//4 bits per channel, and alpha remains full, so 12 bits total
+	vec4 res;
+	res.xyz = mod(v * vec3(1./16., 1., 16.), vec3(1.));
+	res.w = step(v, 0.);
+	return res;
+}
+float fixedToFloat(vec4 c) {
+	return (c.w * 2. - 1.) * dot(c.xyz, vec3(16., 1., 1./16.));
 }
 #endif
 		</script>
@@ -82,10 +93,9 @@ uniform samplerCube skyTex;
 uniform sampler2D lightVelXTex;
 uniform sampler2D lightVelYTex;
 uniform sampler2D lightVelZTex;
-
 void main() {
-	vec3 dir;
 	/* works */
+	vec3 dir;
 	dir.x = fixedToFloat(texture2D(lightVelXTex, uv));
 	dir.y = fixedToFloat(texture2D(lightVelYTex, uv));
 	dir.z = fixedToFloat(texture2D(lightVelZTex, uv));
@@ -93,11 +103,29 @@ void main() {
 	gl_FragColor.w = 1.; 
 	/**/
 	/* debugging * /
-	gl_FragColor.x = fixedToFloat(texture2D(lightVelXTex, uv));
-	gl_FragColor.y = fixedToFloat(texture2D(lightVelYTex, uv));
-	gl_FragColor.z = fixedToFloat(texture2D(lightVelZTex, uv));
+	vec3 dst;
+	vec4 reg;
+	reg = floatToFixed(vtxv.x);
+	dst.x = fixedToFloat(reg);
+	reg = floatToFixed(vtxv.y);
+	dst.y = fixedToFloat(reg);
+	reg = floatToFixed(vtxv.z);
+	dst.z = fixedToFloat(reg);
+	gl_FragColor.xyz = textureCube(skyTex, dst).xyz;
+	gl_FragColor.w = 1.; 
+
+	/**/
+	/* debugging * /
+	gl_FragColor.x = fixedToFloat(texture2D(lightVelXTex, uv)) * .5 + .5;
+	gl_FragColor.y = fixedToFloat(texture2D(lightVelYTex, uv)) * .5 + .5;
+	gl_FragColor.z = fixedToFloat(texture2D(lightVelZTex, uv)) * .5 + .5;
 	gl_FragColor.w = 1.; 
 	/**/
+	/* more debugging * /
+	gl_FragColor.xyz = texture2D(lightVelXTex, uv).xyz;
+	gl_FragColor.w = 1.; 
+	/**/
+
 }
 		</script>
 		<script id='Black_Hole:Alcubierre_Warp_Drive_Bubble:reset:pos:vel:x:y:z:t:vsh' type='x-shader/x-vertex'>
@@ -119,7 +147,6 @@ void main() {
 		</script>
 		<script id='Black_Hole:Alcubierre_Warp_Drive_Bubble:reset:vel:x:fsh' type='x-shader/x-fragment'>
 varying vec3 vtxv;
-uniform float objectCenter;
 void main() {
 	vec3 dir = normalize(vtxv);
 	gl_FragColor = floatToFixed(dir.x);
@@ -193,12 +220,11 @@ void main() {
 attribute vec2 vtx;
 varying vec2 uv;
 varying vec3 vtxv;
-uniform mat4 projMat;
 uniform mat3 rotation;
 void main() {
 	uv = vtx;
 	vtxv = rotation * vec3(vtx * 2. - 1., 1.);
-	gl_Position = projMat * vec4(vtx, 0., 1.);
+	gl_Position = vec4(vtx * 2. - 1., 0., 1.);
 }
 		</script>
 		<script id='Black_Hole:Alcubierre_Warp_Drive_Bubble:iterate:pos:vel:x:y:z:t:fsh' type='x-shader/x-fragment'>
