@@ -97,20 +97,19 @@ function resetField() {
 					// (1 - 2M/r) vt^2 = (vx^2 + vy^2 + vz^2) / (1 - 2M/r)
 					// vt^2 = (vx^2 + vy^2 + vz^2) / (1 - 2M/r)^2
 					// vt = ||vx,vy,vz|| / (1 - 2M/r)
+					pos[0] -= objectDist;	//center of metric is black hole origin
 					var r = vec3.length(pos);
 					var oneMinus2MOverR = 1 - 2*blackHoleMass/r;
 					vel[3] = 1 / oneMinus2MOverR;
 				} else if (objectType == 'Alcubierre Warp Drive Bubble') {
 					//g_ab v^a v^b = 0
 					//... later
-					var r = vec3.length(pos);
-					var sigmaFront = warpBubbleThickness * (r + warpBubbleRadius);
-					var sigmaCenter = warpBubbleThickness * r;
-					var sigmaBack = warpBubbleThickness * (r - warpBubbleRadius);
+					var rs = vec3.dist(pos, vec3.fromValues(objectDist,0,0));	//center is view pos, but rs is measured from bubble origin
+					var sigmaFront = warpBubbleThickness * (rs + warpBubbleRadius);
+					var sigmaCenter = warpBubbleThickness * rs;
+					var sigmaBack = warpBubbleThickness * (rs - warpBubbleRadius);
 					var tanhSigmaCenter = tanh(sigmaCenter);
 					var f = (tanh(sigmaFront) - tanh(sigmaBack)) / (2 * tanhSigmaCenter);
-					var sechDiff = sechSq(sigmaFront) - sechSq(sigmaBack);
-					var dfScalar = sechDiff / (2 * r * tanhSigmaCenter);				
 				
 					var vf = f * warpBubbleVelocity;
 					var vf2 = vf * vf;
@@ -121,10 +120,10 @@ function resetField() {
 				}
 				
 				//position (relative to black hole)
-				lightBuf[i++] = vel[0] - objectDist;
-				lightBuf[i++] = vel[1];
-				lightBuf[i++] = vel[2];
-				lightBuf[i++] = 0;
+				lightBuf[i++] = pos[0];
+				lightBuf[i++] = pos[1];
+				lightBuf[i++] = pos[2];
+				lightBuf[i++] = pos[3];
 				//velocity
 				lightBuf[i++] = vel[0];
 				lightBuf[i++] = vel[1];
@@ -398,8 +397,10 @@ $(document).ready(function(){
 
 	cubeObj = new GL.SceneObject({
 		mode : gl.TRIANGLES,
-		vertexBuffer : cubeVtxBuf,
-		indexBuffer : cubeIndexBuf,
+		attrs : {
+			vertex : cubeVtxBuf
+		},
+		indexes : cubeIndexBuf,
 		shader : cubeShader,
 		texs : [skyTex, lightPosTex],
 		static : false

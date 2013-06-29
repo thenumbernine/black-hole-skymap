@@ -358,7 +358,9 @@ $(document).ready(function(){
 	//used for off-screen rendering and not part of the scene graph
 	fboQuad = new GL.SceneObject({
 		mode : gl.TRIANGLE_STRIP,
-		vertexBuffer : unitQuadVertexBuffer,
+		attrs : {
+			vertex : unitQuadVertexBuffer
+		},
 		parent : null
 	});	
 	
@@ -398,8 +400,10 @@ $(document).ready(function(){
 
 	cubeObj = new GL.SceneObject({
 		mode : gl.TRIANGLES,
-		vertexBuffer : cubeVtxBuf,
-		indexBuffer : cubeIndexBuf,
+		attrs : {
+			vertex : cubeVtxBuf
+		},
+		indexes : cubeIndexBuf,
 		shader : cubeShader,
 		texs : [skyTex, lightVelTex],
 		static : false

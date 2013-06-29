@@ -364,7 +364,9 @@ $(document).ready(function(){
 	//used for off-screen rendering and not part of the scene graph
 	fboQuad = new GL.SceneObject({
 		mode : gl.TRIANGLE_STRIP,
-		vertexBuffer : unitQuadVertexBuffer,
+		attrs : {
+			vertex : unitQuadVertexBuffer
+		},
 		parent : null
 	});	
 	
@@ -387,7 +389,9 @@ $(document).ready(function(){
 	for (var side = 0; side < 6; ++side) {
 		cubeSides[side] = new GL.SceneObject({
 			mode : gl.TRIANGLE_STRIP,
-			vertexBuffer : unitQuadVertexBuffer,
+			attrs : {
+				vertex : unitQuadVertexBuffer
+			},
 			shader : cubeShader,
 			texs : [skyTex, lightPosVelChannels[1].texs[0][side]],
 			angle : angleForSide[side]

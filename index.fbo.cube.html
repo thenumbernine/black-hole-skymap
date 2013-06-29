@@ -40,13 +40,13 @@ float sechSq(float x) {
 }
 		</script>
 		<script id='cube-vsh' type='x-shader/x-vertex'>
-attribute vec2 vtx;
+attribute vec2 vertex;
 varying vec2 uv;
 uniform mat4 mvMat;
 uniform mat4 projMat;
 void main() {
-	uv = vtx;
-	vec4 vtx4 = mvMat * vec4(vtx * 2. - 1., 1., 1.);
+	uv = vertex;
+	vec4 vtx4 = mvMat * vec4(vertex * 2. - 1., 1., 1.);
 	gl_Position = projMat * vtx4;
 }
 		</script>
@@ -69,12 +69,12 @@ void main() {
 }
 		</script>
 		<script id='Black_Hole:Alcubierre_Warp_Drive_Bubble:reset:pos:vel:vsh' type='x-shader/x-vertex'>
-attribute vec2 vtx;
+attribute vec2 vertex;
 varying vec3 vtxv;
 uniform mat3 rotation;
 void main() {
-	vtxv = rotation * vec3(vtx * 2. - 1., 1.);
-	gl_Position = vec4(vtx * 2. - 1., 0., 1.);
+	vtxv = rotation * vec3(vertex * 2. - 1., 1.);
+	gl_Position = vec4(vertex * 2. - 1., 0., 1.);
 }
 		</script>
 		<script id='Black_Hole:Alcubierre_Warp_Drive_Bubble:reset:pos:fsh' type='x-shader/x-fragment'>
@@ -139,14 +139,14 @@ void main() {
 		</script>
 		<script id='Black_Hole:Alcubierre_Warp_Drive_Bubble:iterate:pos:vel:vsh' type='x-shader/x-vertex'>
 #extension GL_OES_texture_float : enable
-attribute vec2 vtx;
+attribute vec2 vertex;
 varying vec2 uv;
 varying vec3 vtxv;
 uniform mat3 rotation;
 void main() {
-	uv = vtx;
-	vtxv = rotation * vec3(vtx * 2. - 1., 1.);
-	gl_Position = vec4(vtx * 2. - 1., 0., 1.);
+	uv = vertex;
+	vtxv = rotation * vec3(vertex * 2. - 1., 1.);
+	gl_Position = vec4(vertex * 2. - 1., 0., 1.);
 }
 		</script>
 		<script id='Black_Hole:Alcubierre_Warp_Drive_Bubble:iterate:pos:vel:fsh' type='x-shader/x-fragment'>

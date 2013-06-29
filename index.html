@@ -23,23 +23,23 @@ _gaq.push(['_trackPageview']);
 </script>
 
 		<script id='cube-vsh' type='x-shader/x-vertex'>
-attribute vec3 vtx;
-varying vec3 vtxv;
+attribute vec3 vertex;
+varying vec3 vertexv;
 uniform mat4 mvMat;
 uniform mat4 projMat;
 void main() {
-	vtxv = vtx;
-	gl_Position = projMat * mvMat * vec4(vtx, 1.);
+	vertexv = vertex;
+	gl_Position = projMat * mvMat * vec4(vertex, 1.);
 }
 		</script>
 		<script id='cube-fsh' type='x-shader/x-fragment'>
 precision mediump float;
-varying vec3 vtxv;
+varying vec3 vertexv;
 uniform samplerCube skyTex;
 uniform samplerCube lightPosTex;
 
 void main() {
-	vec3 dir = textureCube(lightPosTex, vtxv).xyz * 2. - 1.;
+	vec3 dir = textureCube(lightPosTex, vertexv).xyz * 2. - 1.;
 	gl_FragColor = textureCube(skyTex, dir);
 	gl_FragColor.w = 1.; 
 }
