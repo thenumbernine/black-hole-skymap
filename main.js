@@ -87,8 +87,9 @@ function resetField() {
 				//this still allows a degree of freedom in the spatial length ... (why is this?)
 				//let's keep it normalized
 				vec3.normalize(vel, vel);
-				vec4.copy(pos, vel);
-				pos[3] = 0;
+				//vec4.copy(pos, vel);
+				//pos[3] = 0;
+				vec4.set(pos, 0,0,0,0);
 
 				if (objectType == 'Black Hole') {
 					//when initializing our metric:
@@ -400,6 +401,9 @@ $(document).ready(function(){
 		attrs : {
 			vertex : cubeVtxBuf
 		},
+		uniforms : {
+			viewAngle : GL.view.angle
+		},
 		indexes : cubeIndexBuf,
 		shader : cubeShader,
 		texs : [skyTex, lightPosTex],
@@ -411,7 +415,7 @@ $(document).ready(function(){
 		pressObj : canvas,
 		move : function(dx,dy) {
 			var rotAngle = Math.PI / 180 * .01 * Math.sqrt(dx*dx + dy*dy);
-			quat.setAxisAngle(tmpQ, [dy, dx, 0], rotAngle);
+			quat.setAxisAngle(tmpQ, [-dy, dx, 0], rotAngle);
 
 			quat.mul(GL.view.angle, GL.view.angle, tmpQ);
 			quat.normalize(GL.view.angle, GL.view.angle);
