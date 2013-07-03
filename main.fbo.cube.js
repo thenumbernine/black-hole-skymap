@@ -255,7 +255,7 @@ $(document).ready(function(){
 */
 
 	try {
-		gl = GL.init(canvas, {debug:true});
+		gl = GL.init(canvas);
 	} catch (e) {
 		panel.remove();
 		$(canvas).remove();
