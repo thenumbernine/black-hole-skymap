@@ -74,8 +74,8 @@ vec3 qtransform( vec4 q, vec3 v ){
 }
 void main() {
 	vec3 dir = texture2D(lightVelTex, uv).xyz;
-	dir = qtransform(vec4(viewAngle.xyz, viewAngle.w), dir);
-	dir = viewMatrixInv * dir;
+	dir = viewMatrixInv * viewMatrixInv * dir;
+	dir = qtransform(vec4(viewAngle.xyz, -viewAngle.w), dir);
 	gl_FragColor.xyz = textureCube(skyTex, dir).xyz;
 	gl_FragColor.w = 1.; 
 }
