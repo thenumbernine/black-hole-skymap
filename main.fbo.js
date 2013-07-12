@@ -378,7 +378,7 @@ $(document).ready(function(){
 			+ $('#cube-fsh').text(),
 		uniforms : {
 			skyTex : 0,
-			lightVelTex : 1,
+			lightVelTex : 1
 		}
 	});
 
@@ -392,9 +392,12 @@ $(document).ready(function(){
 			attrs : {
 				vertex : unitQuadVertexBuffer
 			},
+			uniforms : {
+				viewAngle : GL.view.angle,
+				angle : angleForSide[side]
+			},
 			shader : cubeShader,
 			texs : [skyTex, lightPosVelChannels[1].texs[0][side]],
-			angle : angleForSide[side]
 		});
 	}
 
@@ -403,7 +406,7 @@ $(document).ready(function(){
 		pressObj : canvas,
 		move : function(dx,dy) {
 			var rotAngle = Math.PI / 180 * .01 * Math.sqrt(dx*dx + dy*dy);
-			quat.setAxisAngle(tmpQ, [dy, dx, 0], rotAngle);
+			quat.setAxisAngle(tmpQ, [-dy, -dx, 0], rotAngle);
 
 			quat.mul(GL.view.angle, GL.view.angle, tmpQ);
 			quat.normalize(GL.view.angle, GL.view.angle);

@@ -42,11 +42,21 @@ float sechSq(float x) {
 		<script id='cube-vsh' type='x-shader/x-vertex'>
 attribute vec2 vertex;
 varying vec2 uv;
-uniform mat4 mvMat;
 uniform mat4 projMat;
+uniform vec4 angle;
+const mat3 viewMatrix = mat3(
+	0., 0., -1.,
+	1., 0., 0., 
+	0., -1., 0.);
+vec3 qtransform( vec4 q, vec3 v ){ 
+	return v + 2.0*cross(cross(v, q.xyz ) + q.w*v, q.xyz);
+}
 void main() {
 	uv = vertex;
-	vec4 vtx4 = mvMat * vec4(vertex * 2. - 1., 1., 1.);
+	vec3 vtx3 = vec3(vertex * 2. - 1., 1.);
+	vtx3 = qtransform(vec4(angle.xyz, -angle.w), vtx3);
+	vtx3 = viewMatrix * vtx3;
+	vec4 vtx4 = vec4(vtx3, 1.);
 	gl_Position = projMat * vtx4;
 }
 		</script>
@@ -54,18 +64,20 @@ void main() {
 varying vec2 uv;
 uniform samplerCube skyTex;
 uniform sampler2D lightVelTex;
+uniform vec4 viewAngle;
+const mat3 viewMatrixInv = mat3(
+	0., 1., 0.,
+	0., 0., -1.,
+	-1., 0., 0.);
+vec3 qtransform( vec4 q, vec3 v ){ 
+	return v + 2.0*cross(cross(v, q.xyz ) + q.w*v, q.xyz);
+}
 void main() {
-	/* works */
 	vec3 dir = texture2D(lightVelTex, uv).xyz;
+	dir = qtransform(vec4(viewAngle.xyz, viewAngle.w), dir);
+	dir = viewMatrixInv * dir;
 	gl_FragColor.xyz = textureCube(skyTex, dir).xyz;
 	gl_FragColor.w = 1.; 
-	/**/
-	
-	/* debugging * /
-	gl_FragColor.xyz = texture2D(lightVelTex, uv).xyz * .5 + .5;
-	gl_FragColor.w = 1.; 
-	/**/
-
 }
 		</script>
 		<script id='Black_Hole:Alcubierre_Warp_Drive_Bubble:reset:pos:vel:vsh' type='x-shader/x-vertex'>

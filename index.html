@@ -40,7 +40,7 @@ void main() {
 precision mediump float;
 varying vec3 vertexv;
 uniform samplerCube skyTex;
-uniform samplerCube lightPosTex;
+uniform samplerCube lightVelTex;
 const mat3 viewMatrix = mat3(
 	0., 0., -1.,
 	1., 0., 0., 
@@ -51,7 +51,7 @@ vec3 qtransform( vec4 q, vec3 v ){
 	return v + 2.0*cross(cross(v, q.xyz ) + q.w*v, q.xyz);
 }
 void main() {
-	vec3 dir = textureCube(lightPosTex, vertexv).xyz * 2. - 1.;
+	vec3 dir = textureCube(lightVelTex, vertexv).xyz * 2. - 1.;
 	dir = qtransform(vec4(viewAngle.xyz, -viewAngle.w), viewMatrix * dir);
 	gl_FragColor = textureCube(skyTex, dir);
 	gl_FragColor.w = 1.; 

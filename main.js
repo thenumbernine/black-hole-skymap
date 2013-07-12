@@ -24,11 +24,11 @@ var updateInterval = undefined;
 var lightTexWidth = 256;
 var lightTexHeight = 256;
 var lightBuf; 
-var lightPosTexData = [];
+var lightVelTexData = [];
 for (var side = 0; side < 6; ++side) {
-	lightPosTexData[side] = new Uint8Array(3 * lightTexWidth * lightTexHeight);
+	lightVelTexData[side] = new Uint8Array(3 * lightTexWidth * lightTexHeight);
 }
-var lightPosTex; 
+var lightVelTex; 
 
 function tanh(x) {
 	var exp2x = Math.exp(2 * x);
@@ -133,13 +133,13 @@ function resetField() {
 			}
 		}
 	}
-	updateLightPosTex();
+	updateLightVelTex();
 }
 
 
 //update the uint8 array from the float array
 //then upload the uint8 array to the gpu
-function updateLightPosTex() {	
+function updateLightVelTex() {	
 	//var progress = $('#update-progress');
 	//progress.attr('value', 0);
 	updateInterval = asyncfor({
@@ -232,21 +232,21 @@ function updateLightPosTex() {
 				//don't bother update vw, I don't store it and just reset it afterwards
 				//copy floats to uint8 texture
 				var s = Math.sqrt(newVx * newVx + newVy * newVy + newVz * newVz);
-				lightPosTexData[side][dsti++]  = 255 * (newVx / s * .5 + .5);
-				lightPosTexData[side][dsti++]  = 255 * (newVy / s * .5 + .5);
-				lightPosTexData[side][dsti++]  = 255 * (newVz / s * .5 + .5);
+				lightVelTexData[side][dsti++]  = 255 * (newVx / s * .5 + .5);
+				lightVelTexData[side][dsti++]  = 255 * (newVy / s * .5 + .5);
+				lightVelTexData[side][dsti++]  = 255 * (newVz / s * .5 + .5);
 			}
 		},
 		done : function() {
-			lightPosTex.bind();
+			lightVelTex.bind();
 			for (var side = 0; side < 6; ++side) {
-				assertEquals(lightTexWidth * lightTexHeight * 3, lightPosTexData[side].length); 
-				//gl.texSubImage2D(gl.TEXTURE_CUBE_MAP_POSITIVE_X + side, 0, 0, 0, lightTexWidth, lightTexHeight, gl.RGB, gl.UNSIGNED_BYTE, lightPosTexData[side]);
-				gl.texImage2D(gl.TEXTURE_CUBE_MAP_POSITIVE_X + side, 0, gl.RGB, lightTexWidth, lightTexHeight, 0, gl.RGB, gl.UNSIGNED_BYTE, lightPosTexData[side]);
+				assertEquals(lightTexWidth * lightTexHeight * 3, lightVelTexData[side].length); 
+				//gl.texSubImage2D(gl.TEXTURE_CUBE_MAP_POSITIVE_X + side, 0, 0, 0, lightTexWidth, lightTexHeight, gl.RGB, gl.UNSIGNED_BYTE, lightVelTexData[side]);
+				gl.texImage2D(gl.TEXTURE_CUBE_MAP_POSITIVE_X + side, 0, gl.RGB, lightTexWidth, lightTexHeight, 0, gl.RGB, gl.UNSIGNED_BYTE, lightVelTexData[side]);
 			}
-			lightPosTex.unbind();		
+			lightVelTex.unbind();		
 			
-			updateLightPosTex();	
+			updateLightVelTex();	
 		}
 	});
 }
@@ -347,13 +347,13 @@ $(document).ready(function(){
 		]
 	});
 	
-	lightPosTex = new GL.TextureCube({
+	lightVelTex = new GL.TextureCube({
 		internalFormat : gl.RGB,
 		format : gl.RGB,
 		type : gl.UNSIGNED_BYTE,
 		width : lightTexWidth,
 		height : lightTexHeight,
-		data : lightPosTexData[side],
+		data : lightVelTexData[side],
 		magFilter : gl.LINEAR,
 		minFilter : gl.NEAREST,
 		wrap : {
@@ -370,7 +370,7 @@ $(document).ready(function(){
 		fragmentCodeID : 'cube-fsh',
 		uniforms : {
 			skyTex : 0,
-			lightPosTex : 1,
+			lightVelTex : 1,
 		}
 	});
 
@@ -406,7 +406,7 @@ $(document).ready(function(){
 		},
 		indexes : cubeIndexBuf,
 		shader : cubeShader,
-		texs : [skyTex, lightPosTex],
+		texs : [skyTex, lightVelTex],
 		static : false
 	});
 	
