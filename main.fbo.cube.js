@@ -101,30 +101,29 @@ var rotationMat3 = mat3.create();
 function resetField() {
 	gl.viewport(0, 0, lightTexWidth, lightTexHeight);
 	
-	
-		for (var side = 0; side < 6; ++side) {
-			var shader = lightPosTex.shaders[objectType].reset;
-			
-			if (lightPosTex.uniforms !== undefined) {
-				for (var i = 0; i < lightPosTex.uniforms.length; ++i) {
-					var uniformName = lightPosTex.uniforms[i];
-					lightPosTex.uniforms[uniformName] = window[uniformName];
-				}
+	for (var side = 0; side < 6; ++side) {
+		var shader = lightPosTex.shaders[objectType].reset;
+		
+		if (lightPosTex.uniforms !== undefined) {
+			for (var i = 0; i < lightPosTex.uniforms.length; ++i) {
+				var uniformName = lightPosTex.uniforms[i];
+				lightPosTex.uniforms[uniformName] = window[uniformName];
 			}
-			mat3.fromQuat(rotationMat3, angleForSide[side]);
-			uniforms.rotation = rotationMat3;
-			
-			var fbo = channel.fbos[0][side];
-			fbo.draw({
-				callback:function(){
-					fboQuad.draw({
-						shader:shader,
-						uniforms:uniforms
-					});
-				}
-			});
 		}
-	});
+		mat3.fromQuat(rotationMat3, angleForSide[side]);
+		uniforms.rotation = rotationMat3;
+		
+		var fbo = channel.fbos[0][side];
+		fbo.draw({
+			callback:function(){
+				fboQuad.draw({
+					shader:shader,
+					uniforms:uniforms
+				});
+			}
+		});
+	}
+	
 	gl.viewport(0, 0, GL.canvas.width, GL.canvas.height);
 }
 

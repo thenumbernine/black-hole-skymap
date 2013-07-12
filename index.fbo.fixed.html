@@ -94,7 +94,7 @@ uniform sampler2D lightVelXTex;
 uniform sampler2D lightVelYTex;
 uniform sampler2D lightVelZTex;
 void main() {
-	/* works */
+	/* works * /
 	vec3 dir;
 	dir.x = fixedToFloat(texture2D(lightVelXTex, uv));
 	dir.y = fixedToFloat(texture2D(lightVelYTex, uv));
@@ -113,9 +113,8 @@ void main() {
 	dst.z = fixedToFloat(reg);
 	gl_FragColor.xyz = textureCube(skyTex, dst).xyz;
 	gl_FragColor.w = 1.; 
-
 	/**/
-	/* debugging * /
+	/* debugging */
 	gl_FragColor.x = fixedToFloat(texture2D(lightVelXTex, uv)) * .5 + .5;
 	gl_FragColor.y = fixedToFloat(texture2D(lightVelYTex, uv)) * .5 + .5;
 	gl_FragColor.z = fixedToFloat(texture2D(lightVelZTex, uv)) * .5 + .5;
