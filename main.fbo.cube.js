@@ -287,12 +287,12 @@ $(document).ready(function(){
 			t : gl.CLAMP_TO_EDGE
 		},
 		urls : [
-			'skytex/sky-infrared-cube-xp.png',
-			'skytex/sky-infrared-cube-xn.png',
-			'skytex/sky-infrared-cube-yp.png',
-			'skytex/sky-infrared-cube-yp.png',
-			'skytex/sky-infrared-cube-zn.png',
-			'skytex/sky-infrared-cube-zn.png'
+			'skytex/sky-visible-cube-xp.png',
+			'skytex/sky-visible-cube-xn.png',
+			'skytex/sky-visible-cube-yp.png',
+			'skytex/sky-visible-cube-yp.png',
+			'skytex/sky-visible-cube-zn.png',
+			'skytex/sky-visible-cube-zn.png'
 		]
 	});
 
