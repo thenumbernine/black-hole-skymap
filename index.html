@@ -2,14 +2,18 @@
 <html>
 	<head>
 		<title>Black Hole Iterative Skymap - WebGL</title>
+		<meta name="viewport" content="width=device-width, initial-scale=1">
+		<meta name="apple-mobile-web-app-capable" content="yes"/>
+		<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
 		
-		<script language='javascript' type='text/javascript' src='../js/jquery-1.10.0.min.js'></script>
-		<script language='javascript' type='text/javascript' src='../js/util.js'></script>
-		<script language='javascript' type='text/javascript' src='../js/gl-matrix-min.js'></script>
-		<script language='javascript' type='text/javascript' src='../js/webgl-debug.js'></script>
-		<script language='javascript' type='text/javascript' src='../js/gl-util.js'></script>
-		<script language='javascript' type='text/javascript' src='../js/mouse3d.js'></script>
-		<script language='javascript' type='text/javascript' src='main.js'></script>
+		<script type='text/javascript' src='../js/jquery-1.10.0.min.js'></script>
+		<script type='text/javascript' src='../js/util.js'></script>
+		<script type='text/javascript' src='../js/gl-matrix-min.js'></script>
+		<script type='text/javascript' src='../js/webgl-debug.js'></script>
+		<script type='text/javascript' src='../js/gl-util.js'></script>
+		<script type='text/javascript' src='../js/mouse3d.js'></script>
+		<script type="text/javascript" src="http://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
+		<script type='text/javascript' src='main.js'></script>
 		
 <script type='text/javascript'>
 var _gaq = _gaq || [];
@@ -88,7 +92,7 @@ a:active {
 		</style>
 	</head>
 	<body style='margin:0px; overflow:hidden'>
-		<div id='panel' style='width:400px; position:absolute; background-color:rgba(0,0,0,.25)'>
+		<div id='panel' style='width:400; position:absolute; background-color:rgba(0,0,0,.5)'>
 			<select id='objectTypes'></select><br>
 			Iteration d/dLambda: <input id='deltaLambda'/><br>
 			Object Distance (m): <input id='objectDist'/><br>
@@ -101,6 +105,20 @@ a:active {
 			<button id='reset'>Reset</button><br>
 			<!-- button id='pause'>Pause</button><br -->
 			<!-- Update: <progress id='update-progress' max='100' value='0'></progress><br> -->
+	
+			<!-- still working on this 
+			<br>
+			<h3>Light and Geodesics</h3>
+			Light travels in a straight line.  Turns out the spacetime that light travels through is curved.
+			So how does one find the path that light travels through spacetime?  Enter geodesics.
+			Geodesics calculate the path that a straight line takes over an arbitrary surface.
+			The general equation is described as:<br>
+			\( x^\mu = -\Gamma^\mu_\alpha_\beta x^\alpha x^\beta \)<br>
+			Where \( \Gamma^\mu_\alpha_\beta \) is our Christoffel Symbol of the Second (?) Kind.
+			This gives us a relation between the acceleration and the velocity of our test particle travelling across the geodesic.
+			It turns out the coefficients of the velocity (stored in \( \Gamma^\mu_\alpha_\beta \) ) tend to be based on the position as well.
+			In the end we get a formula for computing the acceleration based on the state of the particle.
+			-->
 		</div>
 		<div id='webglfail' style='display:none'>
 			Sorry, your browser does not support WebGL<br>
