@@ -46,14 +46,21 @@ function sechSq(x) {
 }
 
 var SQRT_1_2 = Math.sqrt(.5);
+//forward-transforming (object rotations)
 var angleForSide = [
 	[SQRT_1_2,0,SQRT_1_2,0],
 	[SQRT_1_2,0,-SQRT_1_2,0],
-	[-SQRT_1_2,0,0,SQRT_1_2],
 	[SQRT_1_2,0,0,SQRT_1_2],
+	[-SQRT_1_2,0,0,SQRT_1_2],
 	[1,0,0,0],
 	[0,0,1,0]
 ];
+//inverse-transforming (view rotations)
+var angleForSideInv = [];
+for (var i = 0; i < angleForSide.length; ++i) {
+	angleForSideInv[i] = quat.create();
+	quat.conjugate(angleForSideInv[i], angleForSide[i]);
+}
 
 function resize() {
 	canvas.width = window.innerWidth;
@@ -77,7 +84,7 @@ function resetField() {
 				vel[0] = (u + .5) / lightTexWidth * 2 - 1;
 				vel[1] = 1 - (v + .5) / lightTexHeight * 2;
 				vel[2] = 1;
-				vec3.transformQuat(vel,vel,angleForSide[side]);
+				vec3.transformQuat(vel, vel, angleForSideInv[side]);
 
 				//[3] will be the time (0'th) coordinate
 				//light velocities must be unit in minkowski space
@@ -265,8 +272,8 @@ var skyTexFilenames = [
 	'skytex/sky-visible-cube-xp.png',
 	'skytex/sky-visible-cube-xn.png',
 	'skytex/sky-visible-cube-yp.png',
-	'skytex/sky-visible-cube-yp.png',
-	'skytex/sky-visible-cube-zn.png',
+	'skytex/sky-visible-cube-yn.png',
+	'skytex/sky-visible-cube-zp.png',
 	'skytex/sky-visible-cube-zn.png'
 ];
 
@@ -352,8 +359,9 @@ function main2() {
 	
 	GL.view.zNear = .1;
 	GL.view.zFar = 100;
-	GL.view.fovY = 45;
-	quat.mul(GL.view.angle, [SQRT_1_2,0,SQRT_1_2,0], [-SQRT_1_2,SQRT_1_2,0,0]);
+	GL.view.fovY = 90;
+	quat.mul(GL.view.angle, /*90' x*/[SQRT_1_2,0,0,SQRT_1_2], /*90' -y*/[0,-SQRT_1_2,0,SQRT_1_2]);
+	console.log('initial angle '+quat.str(GL.view.angle));
 
 	console.log('creating skyTex');
 	var skyTex = new GL.TextureCube({
@@ -451,7 +459,7 @@ function main3(skyTex) {
 		pressObj : canvas,
 		move : function(dx,dy) {
 			var rotAngle = Math.PI / 180 * .01 * Math.sqrt(dx*dx + dy*dy);
-			quat.setAxisAngle(tmpQ, [-dy, dx, 0], rotAngle);
+			quat.setAxisAngle(tmpQ, [dy, dx, 0], rotAngle);
 
 			quat.mul(GL.view.angle, GL.view.angle, tmpQ);
 			quat.normalize(GL.view.angle, GL.view.angle);

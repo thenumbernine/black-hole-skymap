@@ -303,8 +303,8 @@ function main2() {
 	
 	GL.view.zNear = .1;
 	GL.view.zFar = 100;
-	GL.view.fovY = 45;
-	quat.mul(GL.view.angle, [SQRT_1_2,0,SQRT_1_2,0], [-SQRT_1_2,SQRT_1_2,0,0]);
+	GL.view.fovY = 90;
+	quat.mul(GL.view.angle, /*90' x*/[SQRT_1_2,0,0,SQRT_1_2], /*90' -y*/[0,-SQRT_1_2,0,SQRT_1_2]);
 
 	console.log('creating skyTex');
 	var skyTex = new GL.TextureCube({

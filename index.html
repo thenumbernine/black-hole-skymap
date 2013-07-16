@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html>
 	<head>
+		<meta charset="UTF-8">
 		<title>Black Hole Iterative Skymap - WebGL</title>
 		<meta name="viewport" content="width=device-width, initial-scale=1">
 		<meta name="apple-mobile-web-app-capable" content="yes"/>
@@ -45,10 +46,14 @@ precision mediump float;
 varying vec3 vertexv;
 uniform samplerCube skyTex;
 uniform samplerCube lightVelTex;
+//why does the y axis have to be flipped?
+//something to do with our texture upload having its y flipped?
+//how do I fix that?
+//...or is it that I'm using/notusing unpack_flip_y in my test case by which i aligned my cube side transformations, and that should be reversed?
 const mat3 viewMatrix = mat3(
 	0., 0., -1.,
 	1., 0., 0., 
-	0., -1., 0.);
+	0., 1., 0.);
 
 uniform vec4 viewAngle;
 vec3 qtransform( vec4 q, vec3 v ){ 

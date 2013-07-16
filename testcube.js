@@ -7,16 +7,6 @@ var gl;
 var mouse;
 var cubeObj;
 
-var SQRT_1_2 = Math.sqrt(.5);
-var angleForSide = [
-	[SQRT_1_2,0,SQRT_1_2,0],
-	[SQRT_1_2,0,-SQRT_1_2,0],
-	[-SQRT_1_2,0,0,SQRT_1_2],
-	[SQRT_1_2,0,0,SQRT_1_2],
-	[1,0,0,0],
-	[0,0,1,0]
-];
-
 function resize() {
 	canvas.width = window.innerWidth;
 	canvas.height = window.innerHeight;
@@ -76,8 +66,9 @@ function main2() {
 	
 	GL.view.zNear = .1;
 	GL.view.zFar = 100;
-	GL.view.fovY = 45;
-	quat.mul(GL.view.angle, [SQRT_1_2,0,SQRT_1_2,0], [-SQRT_1_2,SQRT_1_2,0,0]);
+	GL.view.fovY = 90;
+	var SQRT_1_2 = Math.sqrt(.5);
+	quat.mul(GL.view.angle, /*90' x*/[SQRT_1_2,0,0,SQRT_1_2], /*90' -y*/[0,-SQRT_1_2,0,SQRT_1_2]);
 
 	console.log('creating skyTex');
 	var skyTex = new GL.TextureCube({
@@ -151,7 +142,7 @@ function main3(skyTex) {
 		pressObj : canvas,
 		move : function(dx,dy) {
 			var rotAngle = Math.PI / 180 * .01 * Math.sqrt(dx*dx + dy*dy);
-			quat.setAxisAngle(tmpQ, [-dy, dx, 0], rotAngle);
+			quat.setAxisAngle(tmpQ, [dy, dx, 0], rotAngle);
 
 			quat.mul(GL.view.angle, GL.view.angle, tmpQ);
 			quat.normalize(GL.view.angle, GL.view.angle);

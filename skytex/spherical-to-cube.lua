@@ -7,36 +7,23 @@ local Quat = require 'vec.quat'
 local Image = require 'image'
 require 'ext'
 
---[[
+-- [[
 local destFilenamePrefix = 'sky-visible-cube-'
 local destImageWidth = 1024
 local destImageHeight = 1024
 --]]
--- [[ for testing algorithms
+--[[ for testing algorithms
 local destFilenamePrefix = 'sky-visible-cube-'
 local destImageWidth = 128
 local destImageHeight = 128
 --]]
 
 local SQRT_1_2 = math.sqrt(.5)
-
-
-
-
-local zn2xp = Quat():fromAngleAxis(1,0,0,180) * Quat():fromAngleAxis(0,0,1,180)
 local sides = table{
---[[
-	{name='xp', angle=zn2xp*Quat(-SQRT_1_2,0,-SQRT_1_2,0), readMarkerColor=vec3(1,0,0)},
-	{name='xn', angle=zn2xp*Quat(-SQRT_1_2,0,SQRT_1_2,0), readMarkerColor=vec3(0,1,1)},
-	{name='yp', angle=zn2xp*Quat(SQRT_1_2,0,0,SQRT_1_2), readMarkerColor=vec3(0,1,0)},
-	{name='yn', angle=zn2xp*Quat(-SQRT_1_2,0,0,SQRT_1_2), readMarkerColor=vec3(1,0,1)},
-	{name='zp', angle=zn2xp*Quat(-1,0,0,0), readMarkerColor=vec3(0,0,1)},
-	{name='zn', angle=zn2xp*Quat(0,0,-1,0), readMarkerColor=vec3(1,1,0)},
---]]
 	{name='xp', angle=Quat(SQRT_1_2,0,SQRT_1_2,0), readMarkerColor=vec3(1,0,0)},
 	{name='xn', angle=Quat(SQRT_1_2,0,-SQRT_1_2,0), readMarkerColor=vec3(0,1,1)},
-	{name='yp', angle=Quat(-SQRT_1_2,0,0,SQRT_1_2), readMarkerColor=vec3(0,1,0)},
-	{name='yn', angle=Quat(SQRT_1_2,0,0,SQRT_1_2), readMarkerColor=vec3(1,0,1)},
+	{name='yp', angle=Quat(SQRT_1_2,0,0,SQRT_1_2), readMarkerColor=vec3(0,1,0)},
+	{name='yn', angle=Quat(-SQRT_1_2,0,0,SQRT_1_2), readMarkerColor=vec3(1,0,1)},
 	{name='zp', angle=Quat(1,0,0,0), readMarkerColor=vec3(0,0,1)},
 	{name='zn', angle=Quat(0,0,1,0), readMarkerColor=vec3(1,1,0)},
 }
@@ -258,10 +245,11 @@ for sideIndex,side in ipairs(sides) do
 				local readj = math.floor(srcj*(readMarkerImageHeight-1)/(srcImageHeight-1))
 				readMarkerImage(readi + math.random(3)-2, readj + math.random(3)-2, unpack(side.readMarkerColor))
 				readDirImage(readi, readj, u, v, .5)
-				
-				--destImage(i,j,srcImage(srci,srcj))
-				
-				-- [[ debugging: draw normalized vector in rgb space on quad borders, solid color corresponding to face on quad center
+			
+				-- [[ draw the image
+				destImage(i,j,srcImage(srci,srcj))
+				--]]
+				--[[ debugging: draw normalized vector in rgb space on quad borders, solid color corresponding to face on quad center
 				if u >= .25 and u <= .75 and v >= .25 and v <= .75 then
 					destImage(i,j, unpack(side.readMarkerColor))
 				else
