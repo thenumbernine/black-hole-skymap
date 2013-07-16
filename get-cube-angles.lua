@@ -12,21 +12,21 @@ local function qprint(q)
 end
 
 --xp
-qprint(Quat():fromAngleAxis(1,0,0,180) * Quat():fromAngleAxis(0,1,0,90))
--- .70710678118655,0,0.70710678118655,0
+qprint((Quat():fromAngleAxis(1,0,0,0) * Quat():fromAngleAxis(0,1,0,90)))
+-- SQRT_1_2,0,SQRT_1_2,0
 --xn
-qprint(Quat():fromAngleAxis(1,0,0,180) * Quat():fromAngleAxis(0,1,0,-90))
--- .70710678118655,0,-0.70710678118655,0
+qprint((Quat():fromAngleAxis(1,0,0,0) * Quat():fromAngleAxis(0,1,0,-90)))
+-- SQRT_1_2,0,-SQRT_1_2,0
 --yp
 qprint(Quat():fromAngleAxis(1,0,0,-90))
--- 0.70710678118655,-0,-0,0.70710678118655
+-- SQRT_1_2,-0,-0,SQRT_1_2
 --yn
 qprint(Quat():fromAngleAxis(1,0,0,90))
--- .70710678118655,0,0,0.70710678118655
+-- SQRT_1_2,0,0,SQRT_1_2
 --zp
 qprint(Quat():fromAngleAxis(1,0,0,180))
--- ,0,0,0
+-- 1,0,0,0
 --zn
 qprint(Quat():fromAngleAxis(0,0,1,180))
--- ,0,1,0
+-- 0,0,1,0
 

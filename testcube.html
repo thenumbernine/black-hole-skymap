@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<title>Cube Map Viewer</title>
+		<meta name="viewport" content="width=device-width, initial-scale=1">
+		<meta name="apple-mobile-web-app-capable" content="yes"/>
+		<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+		
+		<script type='text/javascript' src='../js/jquery-1.10.0.min.js'></script>
+		<script type='text/javascript' src='../js/util.js'></script>
+		<script type='text/javascript' src='../js/gl-matrix-min.js'></script>
+		<script type='text/javascript' src='../js/webgl-debug.js'></script>
+		<script type='text/javascript' src='../js/gl-util.js'></script>
+		<script type='text/javascript' src='../js/mouse3d.js'></script>
+		<script type='text/javascript' src='testcube.js'></script>
+		
+<script type='text/javascript'>
+var _gaq = _gaq || [];
+_gaq.push(['_setAccount', 'UA-17312646-1']);
+_gaq.push(['_trackPageview']);
+(function() {
+	var ga = document.createElement('script'); ga.type = 'text/javascript'; ga.async = true;
+	ga.src = ('https:' == document.location.protocol ? 'https://ssl' : 'http://www') + '.google-analytics.com/ga.js';
+	var s = document.getElementsByTagName('script')[0]; s.parentNode.insertBefore(ga, s);
+})();
+</script>
+
+		<script id='cube-vsh' type='x-shader/x-vertex'>
+attribute vec3 vertex;
+varying vec3 vertexv;
+uniform mat4 projMat;
+
+void main() {
+	vertexv = vertex;
+	gl_Position = projMat * vec4(vertex, 1.);
+}
+		</script>
+		<script id='cube-fsh' type='x-shader/x-fragment'>
+precision mediump float;
+varying vec3 vertexv;
+uniform samplerCube skyTex;
+
+uniform vec4 viewAngle;
+vec3 qtransform( vec4 q, vec3 v ){ 
+	return v + 2.0*cross(cross(v, q.xyz ) + q.w*v, q.xyz);
+}
+void main() {
+	vec3 dir = vertexv;
+	dir = qtransform(vec4(viewAngle.xyz, -viewAngle.w), dir);
+	gl_FragColor = textureCube(skyTex, dir);
+	gl_FragColor.w = 1.; 
+}
+		</script>
+
+		<style type='text/css'>
+
+body {
+	background-color:black;
+	color:white;
+}
+
+a:link {
+	cursor:pointer;
+	color:#00FFFF;
+}
+
+a:visited {
+	cursor:pointer;
+	color:#00FFFF;
+}
+
+a:hover {
+	cursor:pointer;
+	color:#00FFFF;
+}
+
+a:active {
+	cursor:pointer;
+	color:#00FFFF;
+}
+	
+		</style>
+	</head>
+	<body style='margin:0px; overflow:hidden'>
+		<div id='webglfail' style='display:none'>
+			Sorry, your browser does not support WebGL<br>
+			Try one of these other, better browsers:<br>
+			<a href='http://www.google.com/chrome'>Chrome</a><br>
+			<a href='http://www.mozilla.org/firefox'>Firefox</a><br>
+			<a href='http://www.apple.com/safari'>Safari</a><br>
+			<b>Opera Users:</b><br>
+			Enter "opera:config" in the address bar.<br>
+			In the "User Prefs" section set both "Enable Hardware Acceleration" and "Enable WebGL" to "1" and then click "Save".<br>
+			It is still buggy.<br>
+			<b>IE Users:</b><br>
+			Sorry guys, IE doesn't plan to support WebGL.<br>
+			Consider using a more <a href='http://www.w3schools.com/browsers/browsers_stats.asp'>standard compliant</a> browser.<br>
+		</div>
+	</body>
+</html>

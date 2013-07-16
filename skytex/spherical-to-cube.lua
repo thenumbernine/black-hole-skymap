@@ -7,23 +7,38 @@ local Quat = require 'vec.quat'
 local Image = require 'image'
 require 'ext'
 
+--[[
 local destFilenamePrefix = 'sky-visible-cube-'
 local destImageWidth = 1024
 local destImageHeight = 1024
---[[ for testing algorithms
-local destFilenamePrefix = 'sky-visible-cube-testsmall-'
+--]]
+-- [[ for testing algorithms
+local destFilenamePrefix = 'sky-visible-cube-'
 local destImageWidth = 128
 local destImageHeight = 128
 --]]
 
 local SQRT_1_2 = math.sqrt(.5)
+
+
+
+
+local zn2xp = Quat():fromAngleAxis(1,0,0,180) * Quat():fromAngleAxis(0,0,1,180)
 local sides = table{
-	{name='xp', angle=Quat(SQRT_1_2,0,SQRT_1_2,0)},
-	{name='xn', angle=Quat(SQRT_1_2,0,-SQRT_1_2,0)},
-	{name='yp', angle=Quat(-SQRT_1_2,0,0,SQRT_1_2)},
-	{name='yn', angle=Quat(SQRT_1_2,0,0,SQRT_1_2)},
-	{name='zp', angle=Quat(1,0,0,0)},
-	{name='zn', angle=Quat(0,0,1,0)},
+--[[
+	{name='xp', angle=zn2xp*Quat(-SQRT_1_2,0,-SQRT_1_2,0), readMarkerColor=vec3(1,0,0)},
+	{name='xn', angle=zn2xp*Quat(-SQRT_1_2,0,SQRT_1_2,0), readMarkerColor=vec3(0,1,1)},
+	{name='yp', angle=zn2xp*Quat(SQRT_1_2,0,0,SQRT_1_2), readMarkerColor=vec3(0,1,0)},
+	{name='yn', angle=zn2xp*Quat(-SQRT_1_2,0,0,SQRT_1_2), readMarkerColor=vec3(1,0,1)},
+	{name='zp', angle=zn2xp*Quat(-1,0,0,0), readMarkerColor=vec3(0,0,1)},
+	{name='zn', angle=zn2xp*Quat(0,0,-1,0), readMarkerColor=vec3(1,1,0)},
+--]]
+	{name='xp', angle=Quat(SQRT_1_2,0,SQRT_1_2,0), readMarkerColor=vec3(1,0,0)},
+	{name='xn', angle=Quat(SQRT_1_2,0,-SQRT_1_2,0), readMarkerColor=vec3(0,1,1)},
+	{name='yp', angle=Quat(-SQRT_1_2,0,0,SQRT_1_2), readMarkerColor=vec3(0,1,0)},
+	{name='yn', angle=Quat(SQRT_1_2,0,0,SQRT_1_2), readMarkerColor=vec3(1,0,1)},
+	{name='zp', angle=Quat(1,0,0,0), readMarkerColor=vec3(0,0,1)},
+	{name='zn', angle=Quat(0,0,1,0), readMarkerColor=vec3(1,1,0)},
 }
 
 local useSides = table(args)
@@ -36,9 +51,13 @@ if #useSides == 0 then
 	useSides = sides:map(function(side) return side.name end)
 end
 
-local srcImg = Image('eso0932a.png')
-local srcImgWidth, srcImgHeight
-srcImgWidth, srcImgHeight = srcImg:size()
+local srcImage = Image('eso0932a.png')
+local srcImageWidth, srcImageHeight
+srcImageWidth, srcImageHeight = srcImage:size()
+local readMarkerImageWidth = destImageWidth*4
+local readMarkerImageHeight = destImageHeight*4
+local readMarkerImage = Image(readMarkerImageWidth, readMarkerImageHeight, 3)
+local readDirImage = Image(readMarkerImageWidth, readMarkerImageHeight, 3)
 
 -- build our filter
 local function sinc(x) return x == 0 and 1 or math.sin(x) / x end
@@ -59,13 +78,13 @@ local function log2(x)
 end
 
 local startTime = os.time()
-local srcMipMaps = {srcImg}
+local srcMipMaps = {srcImage}
 do
-	local mipMapWidth = math.floor(srcImgWidth / 2)
-	local mipMapHeight = math.floor(srcImgHeight / 2)
+	local mipMapWidth = math.floor(srcImageWidth / 2)
+	local mipMapHeight = math.floor(srcImageHeight / 2)
 	local lastMipMap = srcMipMaps[#srcMipMaps]
 	local lastMipMapWidth, lastMipMapHeight = lastMipMap:size()
-	for level=2,log2(math.max(srcImgWidth,srcImgHeight)) do
+	for level=2,log2(math.max(srcImageWidth,srcImageHeight)) do
 		local mipMapFilename = 'mipmap-'..level..'.png'
 		if mipMapWidth == 0 or mipMapHeight == 0 then break end
 		local newMipMap
@@ -73,7 +92,7 @@ do
 			newMipMap = Image(mipMapFilename)
 		else
 			io.write('saving '..mipMapFilename..'     ') io.flush()
-			newMipMap = Image(mipMapWidth, mipMapHeight)
+			newMipMap = Image(mipMapWidth, mipMapHeight, 3)
 			-- TODO filter	
 			for dstj=0,mipMapHeight-1 do
 				for dsti=0,mipMapWidth-1 do
@@ -104,7 +123,7 @@ do
 					end
 				end
 			end
-			print()
+			print("\008\008\008\008100%%")
 			table.insert(srcMipMaps,newMipMap)
 			mipMapWidth = math.floor(mipMapWidth / 2)
 			mipMapHeight = math.floor(mipMapHeight / 2)
@@ -158,8 +177,8 @@ for sideIndex,side in ipairs(sides) do
 			local srcv = theta / math.pi
 			-- right now, for accuracy/appearance's sake, division and constants are not simplified
 			-- how about a flag to circumvent this?
-			local srci = symmath.simplify(srcu * (srcImgWidth - 1))
-			local srcj = symmath.simplify(srcv * (srcImgHeight - 1))
+			local srci = symmath.simplify(srcu * (srcImageWidth - 1))
+			local srcj = symmath.simplify(srcv * (srcImageHeight - 1))
 			local dSrciDi = symmath.simplify(symmath.diff(srci, i))
 			local dSrciDj = symmath.simplify(symmath.diff(srci, j))
 			local dSrcjDi = symmath.simplify(symmath.diff(srcj, i))
@@ -179,22 +198,24 @@ for sideIndex,side in ipairs(sides) do
 			print('compiling dSrcjDj as '..cmd)
 		end
 		
-		local dstImgFn = destFilenamePrefix..side.name..'.png'
-		io.write('saving '..dstImgFn..'     ') io.flush()
-		local dstImg = Image(destImageWidth, destImageHeight)
+		local destImageFilename = destFilenamePrefix..side.name..'.png'
+		io.write('saving '..destImageFilename..'     ') io.flush()
+		local destImage = Image(destImageWidth, destImageHeight, 3)
 		for j=0,destImageHeight-1 do
 			local v = (j+.5)/destImageHeight
 			for i=0,destImageWidth-1 do
+				local u = (i+.5)/destImageWidth
 				local srci, srcj, dSrciDi, dSrciDj, dSrcjDi, dSrcjDj 	
+				
+				local x,y,z	--debugging
 				if not automagically then -- do the math by hand
-					local u = (i+.5)/destImageWidth
 					-- start in screen space, 90 degree fov
 					local vec = vec3(2*u-1,2*v-1,1)
 					-- rotate to cube side in world space
 					vec = side.angle:rotate(vec)
 					-- pick apart spherical coordinates
 					local r = vec:length()
-					local x,y,z = unpack(vec)
+					x,y,z = unpack(vec)
 					local phi = math.atan2(y,x)
 					local theta = math.acos(z/r)
 					local srcu = math.clamp(phi / math.pi *.5 + .5, 0, 1)
@@ -207,17 +228,17 @@ for sideIndex,side in ipairs(sides) do
 					local dv_dy = d/dy ( acos(z/r) / math.pi )
 					local d_dy_sq = du_dy * du_dy + dv_dy * dv_dy
 					--]]
-					srci = math.floor(srcu * (srcImgWidth - 1))
-					srcj = math.floor(srcv * (srcImgHeight - 1))
+					srci = math.floor(srcu * (srcImageWidth - 1))
+					srcj = math.floor(srcv * (srcImageHeight - 1))
 					--[[
-					dSrciDi = d(math.atan2(y,x))/di .5 / math.pi * (srcImgWidth - 1)
-					dSrciDj = d(math.atan2(y,x))/di .5 / math.pi * dsrcu/dj * (srcImgWidth - 1)
-					dSrcjDi = d(math.acos(z/r))/di / math.pi * (srcImgHeight - 1)
-					dSrcjDj = d(math.acos(z/r))/dj / math.pi * (srcImgHeight - 1)
+					dSrciDi = d(math.atan2(y,x))/di .5 / math.pi * (srcImageWidth - 1)
+					dSrciDj = d(math.atan2(y,x))/di .5 / math.pi * dsrcu/dj * (srcImageWidth - 1)
+					dSrcjDi = d(math.acos(z/r))/di / math.pi * (srcImageHeight - 1)
+					dSrcjDj = d(math.acos(z/r))/dj / math.pi * (srcImageHeight - 1)
 					--]]
 				else -- automagically
-					srci = math.clamp(0, math.floor(srciFunc(i,j)), srcImgWidth-1)
-					srcj = math.clamp(0, math.floor(srcjFunc(i,j)), srcImgHeight-1)
+					srci = math.clamp(0, math.floor(srciFunc(i,j)), srcImageWidth-1)
+					srcj = math.clamp(0, math.floor(srcjFunc(i,j)), srcImageHeight-1)
 					dSrciDi = dSrciDiFunc(i,j)
 					dSrciDj = dSrciDjFunc(i,j)
 					dSrcjDi = dSrcjDiFunc(i,j)
@@ -231,7 +252,23 @@ for sideIndex,side in ipairs(sides) do
 				
 				minReadMipLevel = minReadMinLevel and math.min(minReadMipLevel, readMipLevel) or readMipLevel
 				maxReadMipLevel = maxReadMinLevel and math.max(maxReadMipLevel, readMipLevel) or readMipLevel
-				dstImg(i,j,srcImg(srci,srcj))
+			
+				-- solid colors looks right, how about orientation?
+				local readi = math.floor(srci*(readMarkerImageWidth-1)/(srcImageWidth-1)) 
+				local readj = math.floor(srcj*(readMarkerImageHeight-1)/(srcImageHeight-1))
+				readMarkerImage(readi + math.random(3)-2, readj + math.random(3)-2, unpack(side.readMarkerColor))
+				readDirImage(readi, readj, u, v, .5)
+				
+				--destImage(i,j,srcImage(srci,srcj))
+				
+				-- [[ debugging: draw normalized vector in rgb space on quad borders, solid color corresponding to face on quad center
+				if u >= .25 and u <= .75 and v >= .25 and v <= .75 then
+					destImage(i,j, unpack(side.readMarkerColor))
+				else
+					destImage(i,j,.5*x+.5, .5*y+.5, .5*z+.5)
+				end
+				--]]
+
 				local thisTime = os.time()
 				if thisTime ~= startTime then
 					startTime = thisTime
@@ -240,11 +277,12 @@ for sideIndex,side in ipairs(sides) do
 				end
 			end
 		end
-		print()
+		print("\008\008\008\008100%%")
 		-- currently using sdl_image, which I have only writing to bmp
-		dstImg:save(dstImgFn)
+		destImage:save(destImageFilename)
 	end
 end
-
 print('readMipLevel min',minReadMipLevel,'max',maxReadMipLevel)
+readMarkerImage:save('read-markers.png')
+readDirImage:save('read-directions.png')
 
