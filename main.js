@@ -238,17 +238,13 @@ function updateLightVelTex() {
 			}
 		},
 		done : function() {
-			lightVelTex.bind();
+			gl.bindTexture(gl.TEXTURE_CUBE_MAP, lightVelTex.obj);
 			for (var side = 0; side < 6; ++side) {
 				var target = lightVelTex.getTargetForSide(side);
-				//should work but isn't working
 				gl.texSubImage2D(target, 0, 0, 0, lightTexWidth, lightTexHeight, gl.RGB, gl.UNSIGNED_BYTE, lightVelTexData[side]);
-				//slow, but at least it works
-				//gl.texImage2D(target, 0, gl.RGB, lightTexWidth, lightTexHeight, 0, gl.RGB, gl.UNSIGNED_BYTE, lightVelTexData[side]);
 			}
-			//not at the moment
-			//gl.generateMipmap(target);
-			lightVelTex.unbind();
+			gl.generateMipmap(gl.TEXTURE_CUBE_MAP);
+			gl.bindTexture(gl.TEXTURE_CUBE_MAP, null);
 			
 			updateLightVelTex();	
 		}
@@ -355,9 +351,9 @@ function main2() {
 	console.log('creating skyTex');
 	var skyTex = new GL.TextureCube({
 		flipY : true,
-		//generateMipmap : true,	GL_OUT_OF_MEMORY
+		generateMipmap : true,
 		magFilter : gl.LINEAR,
-		minFilter : gl.NEAREST,//gl.LINEAR_MIPMAP_LINEAR,
+		minFilter : gl.LINEAR_MIPMAP_LINEAR,
 		wrap : {
 			s : gl.CLAMP_TO_EDGE,
 			t : gl.CLAMP_TO_EDGE
@@ -391,12 +387,12 @@ function main3(skyTex) {
 		height : lightTexHeight,
 		data : lightVelTexData,
 		magFilter : gl.LINEAR,
-		minFilter : gl.NEAREST,//minFilter : gl.LINEAR_MIPMAP_LINEAR,
+		minFilter : gl.LINEAR_MIPMAP_LINEAR,
+		generateMipmap : true,
 		wrap : {
 			s : gl.CLAMP_TO_EDGE,
 			t : gl.CLAMP_TO_EDGE
-		}//,
-		//generateMipmap : true
+		}
 	});
 
 	lightBuf = new Float32Array(6 * 4 * 2 * lightTexWidth * lightTexHeight);
