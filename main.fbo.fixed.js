@@ -101,12 +101,12 @@ function buildShaderForFlags(flags) {
 
 var SQRT_1_2 = Math.sqrt(.5);
 var angleForSide = [
-	[SQRT_1_2,0,SQRT_1_2,0],
-	[SQRT_1_2,0,-SQRT_1_2,0],
-	[-SQRT_1_2,0,0,SQRT_1_2],
-	[SQRT_1_2,0,0,SQRT_1_2],
-	[1,0,0,0],
-	[0,0,1,0]
+	[0, -SQRT_1_2, 0, -SQRT_1_2],
+	[0, SQRT_1_2, 0, -SQRT_1_2],
+	[SQRT_1_2, 0, 0, -SQRT_1_2],
+	[SQRT_1_2, 0, 0, SQRT_1_2],
+	[0, 0, 0, -1],
+	[0, -1, 0, 0]
 ];
 
 function resize() {
@@ -329,8 +329,8 @@ $(document).ready(function(){
 			'skytex/sky-visible-cube-xp.png',
 			'skytex/sky-visible-cube-xn.png',
 			'skytex/sky-visible-cube-yp.png',
-			'skytex/sky-visible-cube-yp.png',
-			'skytex/sky-visible-cube-zn.png',
+			'skytex/sky-visible-cube-yn.png',
+			'skytex/sky-visible-cube-zp.png',
 			'skytex/sky-visible-cube-zn.png'
 		]
 	});

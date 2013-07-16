@@ -48,19 +48,13 @@ function sechSq(x) {
 var SQRT_1_2 = Math.sqrt(.5);
 //forward-transforming (object rotations)
 var angleForSide = [
-	[SQRT_1_2,0,SQRT_1_2,0],
-	[SQRT_1_2,0,-SQRT_1_2,0],
-	[SQRT_1_2,0,0,SQRT_1_2],
-	[-SQRT_1_2,0,0,SQRT_1_2],
-	[1,0,0,0],
-	[0,0,1,0]
+	[0, -SQRT_1_2, 0, -SQRT_1_2],
+	[0, SQRT_1_2, 0, -SQRT_1_2],
+	[SQRT_1_2, 0, 0, -SQRT_1_2],
+	[SQRT_1_2, 0, 0, SQRT_1_2],
+	[0, 0, 0, -1],
+	[0, -1, 0, 0]
 ];
-//inverse-transforming (view rotations)
-var angleForSideInv = [];
-for (var i = 0; i < angleForSide.length; ++i) {
-	angleForSideInv[i] = quat.create();
-	quat.conjugate(angleForSideInv[i], angleForSide[i]);
-}
 
 function resize() {
 	canvas.width = window.innerWidth;
@@ -82,9 +76,9 @@ function resetField() {
 		for (var v = 0; v < lightTexHeight; ++v) {
 			for (var u = 0; u < lightTexWidth; ++u) {
 				vel[0] = (u + .5) / lightTexWidth * 2 - 1;
-				vel[1] = 1 - (v + .5) / lightTexHeight * 2;
+				vel[1] = (v + .5) / lightTexHeight * 2 - 1;
 				vel[2] = 1;
-				vec3.transformQuat(vel, vel, angleForSideInv[side]);
+				vec3.transformQuat(vel, vel, angleForSide[side]);
 
 				//[3] will be the time (0'th) coordinate
 				//light velocities must be unit in minkowski space

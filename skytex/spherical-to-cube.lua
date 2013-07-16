@@ -13,20 +13,47 @@ local destImageWidth = 1024
 local destImageHeight = 1024
 --]]
 --[[ for testing algorithms
-local destFilenamePrefix = 'sky-visible-cube-'
+local destFilenamePrefix = 'test-cube-'
 local destImageWidth = 128
 local destImageHeight = 128
 --]]
 
 local SQRT_1_2 = math.sqrt(.5)
 local sides = table{
-	{name='xp', angle=Quat(SQRT_1_2,0,SQRT_1_2,0), readMarkerColor=vec3(1,0,0)},
-	{name='xn', angle=Quat(SQRT_1_2,0,-SQRT_1_2,0), readMarkerColor=vec3(0,1,1)},
-	{name='yp', angle=Quat(SQRT_1_2,0,0,SQRT_1_2), readMarkerColor=vec3(0,1,0)},
-	{name='yn', angle=Quat(-SQRT_1_2,0,0,SQRT_1_2), readMarkerColor=vec3(1,0,1)},
-	{name='zp', angle=Quat(1,0,0,0), readMarkerColor=vec3(0,0,1)},
-	{name='zn', angle=Quat(0,0,1,0), readMarkerColor=vec3(1,1,0)},
+	{
+		name = 'xp',
+		angle = Quat(0, -SQRT_1_2, 0, -SQRT_1_2),--Quat:fromAngleAxis(1,0,0,180) * Quat(math.sqrt(.5),0,math.sqrt(.5),0),
+		readMarkerColor = vec3(1,0,0),
+	},
+	{
+		name = 'xn',
+		angle = Quat(0, SQRT_1_2, 0, -SQRT_1_2),--Quat:fromAngleAxis(1,0,0,180) * Quat(math.sqrt(.5),0,-math.sqrt(.5),0),
+		readMarkerColor = vec3(0,1,1),
+	},
+	{
+		name = 'yp',
+		angle = Quat(SQRT_1_2, 0, 0, -SQRT_1_2),--Quat:fromAngleAxis(1,0,0,180) * Quat(math.sqrt(.5),0,0,math.sqrt(.5)),
+		readMarkerColor = vec3(0,1,0),
+	},
+	{
+		name = 'yn',
+		angle = Quat(SQRT_1_2, 0, 0, SQRT_1_2),--Quat:fromAngleAxis(1,0,0,180) * Quat(-math.sqrt(.5),0,0,math.sqrt(.5)),
+		readMarkerColor = vec3(1,0,1),
+	},
+	{
+		name = 'zp',
+		angle = Quat(0, 0, 0, -1),--Quat:fromAngleAxis(1,0,0,180) * Quat(1,0,0,0),
+		readMarkerColor = vec3(0,0,1),
+	},
+	{
+		name = 'zn', 
+		angle = Quat(0, -1, 0, 0),--Quat:fromAngleAxis(1,0,0,180) * Quat(0,0,1,0),
+		readMarkerColor = vec3(1,1,0),
+	},
 }
+for _,side in ipairs(sides) do
+	print('side angle',side.angle)
+end
 
 local useSides = table(args)
 for _,useSide in ipairs(useSides) do
@@ -41,8 +68,8 @@ end
 local srcImage = Image('eso0932a.png')
 local srcImageWidth, srcImageHeight
 srcImageWidth, srcImageHeight = srcImage:size()
-local readMarkerImageWidth = destImageWidth*4
-local readMarkerImageHeight = destImageHeight*4
+local readMarkerImageWidth = destImageWidth
+local readMarkerImageHeight = destImageHeight
 local readMarkerImage = Image(readMarkerImageWidth, readMarkerImageHeight, 3)
 local readDirImage = Image(readMarkerImageWidth, readMarkerImageHeight, 3)
 
@@ -160,7 +187,7 @@ for sideIndex,side in ipairs(sides) do
 			local r = symmath.sqrt(x^2 + y^2 + z^2)
 			local phi = symmath.atan2(y,x)
 			local theta = symmath.acos(z/r)
-			local srcu = phi / math.pi * .5 + .5
+			local srcu = .5 - phi / math.pi * .5
 			local srcv = theta / math.pi
 			-- right now, for accuracy/appearance's sake, division and constants are not simplified
 			-- how about a flag to circumvent this?
@@ -205,7 +232,7 @@ for sideIndex,side in ipairs(sides) do
 					x,y,z = unpack(vec)
 					local phi = math.atan2(y,x)
 					local theta = math.acos(z/r)
-					local srcu = math.clamp(phi / math.pi *.5 + .5, 0, 1)
+					local srcu = math.clamp(.5 - phi / math.pi *.5, 0, 1)
 					local srcv = math.clamp(theta / math.pi, 0, 1)
 					--[[
 					local du_dx = d/dx ( atan(y/x) / math.pi * .5 )
