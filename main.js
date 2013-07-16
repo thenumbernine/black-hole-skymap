@@ -240,11 +240,15 @@ function updateLightVelTex() {
 		done : function() {
 			lightVelTex.bind();
 			for (var side = 0; side < 6; ++side) {
-				assertEquals(lightTexWidth * lightTexHeight * 3, lightVelTexData[side].length); 
-				//gl.texSubImage2D(gl.TEXTURE_CUBE_MAP_POSITIVE_X + side, 0, 0, 0, lightTexWidth, lightTexHeight, gl.RGB, gl.UNSIGNED_BYTE, lightVelTexData[side]);
-				gl.texImage2D(gl.TEXTURE_CUBE_MAP_POSITIVE_X + side, 0, gl.RGB, lightTexWidth, lightTexHeight, 0, gl.RGB, gl.UNSIGNED_BYTE, lightVelTexData[side]);
+				var target = lightVelTex.getTargetForSide(side);
+				//should work but isn't working
+				gl.texSubImage2D(target, 0, 0, 0, lightTexWidth, lightTexHeight, gl.RGB, gl.UNSIGNED_BYTE, lightVelTexData[side]);
+				//slow, but at least it works
+				//gl.texImage2D(target, 0, gl.RGB, lightTexWidth, lightTexHeight, 0, gl.RGB, gl.UNSIGNED_BYTE, lightVelTexData[side]);
 			}
-			lightVelTex.unbind();		
+			//not at the moment
+			//gl.generateMipmap(target);
+			lightVelTex.unbind();
 			
 			updateLightVelTex();	
 		}
@@ -259,7 +263,20 @@ function update() {
 	requestAnimFrame(update);
 };
 
-$(document).ready(function(){
+$(document).ready(main1);
+
+var skyTexFilenames = [
+	'skytex/sky-visible-cube-xp.png',
+	'skytex/sky-visible-cube-xn.png',
+	'skytex/sky-visible-cube-yp.png',
+	'skytex/sky-visible-cube-yp.png',
+	'skytex/sky-visible-cube-zn.png',
+	'skytex/sky-visible-cube-zn.png'
+];
+
+var glMaxCubeMapTextureSize;
+function main1(){
+	console.log('main1');
 	panel = $('#panel');	
 	canvas = $('<canvas>', {
 		css : {
@@ -298,6 +315,17 @@ $(document).ready(function(){
 		});
 	});
 	
+	try {
+		gl = GL.init(canvas);
+	} catch (e) {
+		panel.remove();
+		$(canvas).remove();
+		$('#webglfail').show();
+		throw e;
+	}
+	
+	glMaxCubeMapTextureSize = gl.getParameter(gl.MAX_CUBE_MAP_TEXTURE_SIZE);
+
 	$('#reset').click(function() {
 		resetField();
 	});
@@ -309,57 +337,66 @@ $(document).ready(function(){
 		}
 	});
 */
+	$(skyTexFilenames).preload(main2);
+}
 
-	try {
-		gl = GL.init(canvas);
-	} catch (e) {
-		panel.remove();
-		$(canvas).remove();
-		$('#webglfail').show();
-		throw e;
+var main2Initialized = false;
+function main2() {
+	if (main2Initialized) {
+		console.log("main2 got called twice again.  check the preloader.");
+		return;
 	}
-	
+	main2Initialized = true; 
 	GL.view.zNear = .1;
 	GL.view.zFar = 100;
 	GL.view.fovY = 45;
 	quat.mul(GL.view.angle, [SQRT_1_2,0,SQRT_1_2,0], [-SQRT_1_2,SQRT_1_2,0,0]);
 
+	console.log('creating skyTex');
 	var skyTex = new GL.TextureCube({
 		flipY : true,
-		generateMipmap : true,
+		//generateMipmap : true,	GL_OUT_OF_MEMORY
 		magFilter : gl.LINEAR,
-		minFilter : gl.LINEAR_MIPMAP_LINEAR,
-		/*
-		magFilter : gl.LINEAR,
-		minFilter : gl.NEAREST,
-		*/
+		minFilter : gl.NEAREST,//gl.LINEAR_MIPMAP_LINEAR,
 		wrap : {
 			s : gl.CLAMP_TO_EDGE,
 			t : gl.CLAMP_TO_EDGE
 		},
-		urls : [
-			'skytex/sky-visible-cube-xp.png',
-			'skytex/sky-visible-cube-xn.png',
-			'skytex/sky-visible-cube-yp.png',
-			'skytex/sky-visible-cube-yp.png',
-			'skytex/sky-visible-cube-zn.png',
-			'skytex/sky-visible-cube-zn.png'
-		]
+		urls : skyTexFilenames,
+		onload : function(side,url,image) {
+			if (glMaxCubeMapTextureSize === +glMaxCubeMapTextureSize) {
+				if (image.width >= glMaxCubeMapTextureSize || image.height > glMaxCubeMapTextureSize) {
+					throw "cube map size "+image.width+"x"+image.height+" cannot exceed "+glMaxCubeMapTextureSize;
+				}
+			}
+		},
+		done : function() {
+			main3(this);
+		}
 	});
-	
+}
+
+function main3(skyTex) {
+	if (glMaxCubeMapTextureSize === +glMaxCubeMapTextureSize) {
+		if (lightTexWidth >= glMaxCubeMapTextureSize || lightTexHeight > glMaxCubeMapTextureSize) {
+			throw "cube map size "+lightTexWidth+"x"+lightTexHeight+" cannot exceed "+glMaxCubeMapTextureSize;
+		}
+	}
+	console.log('creating lightVelTex');
 	lightVelTex = new GL.TextureCube({
 		internalFormat : gl.RGB,
 		format : gl.RGB,
 		type : gl.UNSIGNED_BYTE,
 		width : lightTexWidth,
 		height : lightTexHeight,
-		data : lightVelTexData[side],
+		data : lightVelTexData,
 		magFilter : gl.LINEAR,
-		minFilter : gl.NEAREST,
+		minFilter : gl.NEAREST,//minFilter : gl.LINEAR_MIPMAP_LINEAR,
 		wrap : {
 			s : gl.CLAMP_TO_EDGE,
 			t : gl.CLAMP_TO_EDGE
-		}
+		}//,
+		//generateMipmap : true
 	});
 
 	lightBuf = new Float32Array(6 * 4 * 2 * lightTexWidth * lightTexHeight);
@@ -430,5 +467,5 @@ $(document).ready(function(){
 	$(window).resize(resize);
 	resize();
 	update();
-});
+}
 
