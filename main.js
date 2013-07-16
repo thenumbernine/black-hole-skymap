@@ -283,7 +283,18 @@ function main1(){
 	}).prependTo(document.body).get(0);
 	$(canvas).disableSelection()
 
+	var objectTypeParamDivs = {};
+	var refreshObjectTypeParamDivs = function() {
+		$.each(objectTypeParamDivs, function(divObjectType,objectTypeParamDiv) {
+			if (divObjectType == objectType) {
+				objectTypeParamDiv.show();
+			} else {
+				objectTypeParamDiv.hide();
+			}
+		});
+	};
 	$.each(objectTypes, function(k,v) {
+		objectTypeParamDivs[v] = $('#'+v.replace(new RegExp(' ', 'g'), '_')+'_params');
 		var option = $('<option>', {text:v});
 		option.appendTo($('#objectTypes'));
 		if (v == objectType) {
@@ -292,8 +303,10 @@ function main1(){
 	});
 	$('#objectTypes').change(function() {
 		objectType = $('#objectTypes').val();
+		refreshObjectTypeParamDivs();
 		resetField();
 	});
+	refreshObjectTypeParamDivs();
 
 	$.each([
 		'deltaLambda',
@@ -326,13 +339,6 @@ function main1(){
 		resetField();
 	});
 
-/* async for doesnt lkke pauses...
-	$('#pause').click(function() {
-		if (updateInterval === undefined) {
-		} else {
-		}
-	});
-*/
 	$(skyTexFilenames).preload(main2);
 }
 
@@ -343,6 +349,7 @@ function main2() {
 		return;
 	}
 	main2Initialized = true; 
+	
 	GL.view.zNear = .1;
 	GL.view.zFar = 100;
 	GL.view.fovY = 45;
@@ -360,10 +367,8 @@ function main2() {
 		},
 		urls : skyTexFilenames,
 		onload : function(side,url,image) {
-			if (glMaxCubeMapTextureSize === +glMaxCubeMapTextureSize) {
-				if (image.width >= glMaxCubeMapTextureSize || image.height > glMaxCubeMapTextureSize) {
-					throw "cube map size "+image.width+"x"+image.height+" cannot exceed "+glMaxCubeMapTextureSize;
-				}
+			if (image.width > glMaxCubeMapTextureSize || image.height > glMaxCubeMapTextureSize) {
+				throw "cube map size "+image.width+"x"+image.height+" cannot exceed "+glMaxCubeMapTextureSize;
 			}
 		},
 		done : function() {
@@ -373,10 +378,8 @@ function main2() {
 }
 
 function main3(skyTex) {
-	if (glMaxCubeMapTextureSize === +glMaxCubeMapTextureSize) {
-		if (lightTexWidth >= glMaxCubeMapTextureSize || lightTexHeight > glMaxCubeMapTextureSize) {
-			throw "cube map size "+lightTexWidth+"x"+lightTexHeight+" cannot exceed "+glMaxCubeMapTextureSize;
-		}
+	if (lightTexWidth > glMaxCubeMapTextureSize || lightTexHeight > glMaxCubeMapTextureSize) {
+		throw "cube map size "+lightTexWidth+"x"+lightTexHeight+" cannot exceed "+glMaxCubeMapTextureSize;
 	}
 	console.log('creating lightVelTex');
 	lightVelTex = new GL.TextureCube({
@@ -448,7 +451,7 @@ function main3(skyTex) {
 		pressObj : canvas,
 		move : function(dx,dy) {
 			var rotAngle = Math.PI / 180 * .01 * Math.sqrt(dx*dx + dy*dy);
-			quat.setAxisAngle(tmpQ, [dy, dx, 0], rotAngle);
+			quat.setAxisAngle(tmpQ, [-dy, dx, 0], rotAngle);
 
 			quat.mul(GL.view.angle, GL.view.angle, tmpQ);
 			quat.normalize(GL.view.angle, GL.view.angle);

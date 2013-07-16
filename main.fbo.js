@@ -10,6 +10,7 @@ var warpBubbleThickness = 1;
 var warpBubbleVelocity = .5;
 var warpBubbleRadius = 2;
 var deltaLambda = .1;	//ray forward iteration
+//1024x1024 is just too big for my current card to handle
 var lightTexWidth = 512;
 var lightTexHeight = 512;
 
@@ -186,10 +187,12 @@ function update() {
 	
 	//turn on magnification filter
 	for (var side = 0; side < 6; ++side) {
-		lightPosVelChannels[1].texs[0][side]
-			.bind()
-			.setArgs({magFilter:gl.LINEAR})
-			.unbind();
+		var tex = lightPosVelChannels[1].texs[0][side].obj;
+		gl.bindTexture(gl.TEXTURE_2D, tex);
+		gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+		//gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR);
+		//gl.generateMipmap(gl.TEXTURE_2D);
+		gl.bindTexture(gl.TEXTURE_2D, null);
 	}
 	
 	for (var side = 0; side < 6; ++side) {
@@ -197,20 +200,32 @@ function update() {
 		cubeSides[side].texs[1] = lightPosVelChannels[1].texs[0][side];
 	}
 
+	GL.draw();	
+	
 	//turn off magnification filter
 	for (var side = 0; side < 6; ++side) {
-		lightPosVelChannels[1].texs[0][side]
-			.bind()
-			.setArgs({magFilter:gl.NEAREST})
-			.unbind();
+		var tex = lightPosVelChannels[1].texs[0][side].obj;
+		gl.bindTexture(gl.TEXTURE_2D, tex);
+		gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+		//gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+		gl.bindTexture(gl.TEXTURE_2D, null);
 	}	
-	
-	GL.draw();	
+
 	requestAnimFrame(update);
 };
 
-$(document).ready(function(){
-	panel = $('#panel');	
+$(document).ready(main1);
+	
+var skyTexFilenames = [
+	'skytex/sky-visible-cube-xp.png',
+	'skytex/sky-visible-cube-xn.png',
+	'skytex/sky-visible-cube-yp.png',
+	'skytex/sky-visible-cube-yp.png',
+	'skytex/sky-visible-cube-zn.png',
+	'skytex/sky-visible-cube-zn.png'
+];
+function main1() {
+	panel = $('#panel');
 	canvas = $('<canvas>', {
 		css : {
 			left : 0,
@@ -275,152 +290,160 @@ $(document).ready(function(){
 
 	gl.disable(gl.DITHER);
 
-	var skyTexFilenames = [
-		'skytex/sky-visible-cube-xp.png',
-		'skytex/sky-visible-cube-xn.png',
-		'skytex/sky-visible-cube-yp.png',
-		'skytex/sky-visible-cube-yp.png',
-		'skytex/sky-visible-cube-zn.png',
-		'skytex/sky-visible-cube-zn.png'
-	];
-	$(skyTexFilenames).preload(function() {
-		GL.view.zNear = .1;
-		GL.view.zFar = 100;
-		GL.view.fovY = 45;
-		quat.mul(GL.view.angle, [SQRT_1_2,0,SQRT_1_2,0], [-SQRT_1_2,SQRT_1_2,0,0]);
+	$(skyTexFilenames).preload(main2);
+}
 
-		var skyTex = new GL.TextureCube({
-			flipY : true,
-			generateMipmap : true,
-			magFilter : gl.LINEAR,
-			minFilter : gl.LINEAR_MIPMAP_LINEAR,
-			wrap : {
-				s : gl.CLAMP_TO_EDGE,
-				t : gl.CLAMP_TO_EDGE
-			},
-			urls : skyTexFilenames
-		});
+var main2Initialized = false;
+function main2() {
+	if (main2Initialized) {
+		console.log("main2 got called twice again.  check the preloader.");
+		return;
+	}
+	main2Initialized = true; 
+	
+	GL.view.zNear = .1;
+	GL.view.zFar = 100;
+	GL.view.fovY = 45;
+	quat.mul(GL.view.angle, [SQRT_1_2,0,SQRT_1_2,0], [-SQRT_1_2,SQRT_1_2,0,0]);
 
-		$.each(lightPosVelChannels, function(_,channel) {
-			//working on how to organize this
-			channel.uniforms = ['blackHoleMass', 'warpDriveThickness', 'warpDriveRadius', 'warpDriveVelocity', 'objectDist', 'deltaLambda'];
-			
-			channel.texs = [];
-			channel.fbos = [];
-			for (var history = 0; history < 2; ++history) {
-				var texs = [];
-				channel.texs[history] = texs;
-				var fbos = [];
-				channel.fbos[history] = fbos;
-				for (var side = 0; side < 6; ++side) {
-					var tex = new GL.Texture2D({
-						internalFormat : gl.RGBA,
-						format : gl.RGBA,
-						type : gl.FLOAT,
-						width : lightTexWidth,
-						height : lightTexHeight,
-						magFilter : gl.NEAREST,
-						minFilter : gl.NEAREST,
-						wrap : {
-							s : gl.CLAMP_TO_EDGE,
-							t : gl.CLAMP_TO_EDGE
-						}
-					});
-					texs[side] = tex;
-					
-					var fbo = new GL.Framebuffer();
-					gl.bindFramebuffer(gl.FRAMEBUFFER, fbo.obj);
-					gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, tex.obj, 0);
-					gl.bindFramebuffer(gl.FRAMEBUFFER, null);
-					fbos[side] = fbo;
-				}
-			}
-			
-			channel.shaders = {};
-			$.each(objectTypes, function(_,objType) {
-				var flags = channel.flags.clone();
-				flags.push(objType);
-				channel.shaders[objType] = {};
-				$.each(shaderTypes, function(_,shaderType) {
-					var shflags = flags.clone();
-					shflags.push(shaderType);
-					var args = getShaderProgramArgsForFlags(shflags);
-					args.uniforms = {
-						lightPosTex : 0,
-						lightVelTex : 1
-					};
-					channel.shaders[objType][shaderType] = new GL.ShaderProgram(args);
+	console.log('creating skyTex');
+	var skyTex = new GL.TextureCube({
+		flipY : true,
+		generateMipmap : true,
+		magFilter : gl.LINEAR,
+		minFilter : gl.LINEAR_MIPMAP_LINEAR,
+		wrap : {
+			s : gl.CLAMP_TO_EDGE,
+			t : gl.CLAMP_TO_EDGE
+		},
+		urls : skyTexFilenames,
+		done : function() {
+			main3(this);
+		}
+	});
+}
+
+function main3(skyTex) {
+	$.each(lightPosVelChannels, function(_,channel) {
+		//working on how to organize this
+		channel.uniforms = ['blackHoleMass', 'warpDriveThickness', 'warpDriveRadius', 'warpDriveVelocity', 'objectDist', 'deltaLambda'];
+		
+		channel.texs = [];
+		channel.fbos = [];
+		for (var history = 0; history < 2; ++history) {
+			var texs = [];
+			channel.texs[history] = texs;
+			var fbos = [];
+			channel.fbos[history] = fbos;
+			for (var side = 0; side < 6; ++side) {
+				var tex = new GL.Texture2D({
+					internalFormat : gl.RGBA,
+					format : gl.RGBA,
+					type : gl.FLOAT,
+					width : lightTexWidth,
+					height : lightTexHeight,
+					magFilter : gl.NEAREST,
+					minFilter : gl.NEAREST,
+					wrap : {
+						s : gl.CLAMP_TO_EDGE,
+						t : gl.CLAMP_TO_EDGE
+					}
 				});
+				texs[side] = tex;
+				
+				var fbo = new GL.Framebuffer();
+				gl.bindFramebuffer(gl.FRAMEBUFFER, fbo.obj);
+				gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, tex.obj, 0);
+				gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+				fbos[side] = fbo;
+			}
+		}
+		
+		channel.shaders = {};
+		$.each(objectTypes, function(_,objType) {
+			var flags = channel.flags.clone();
+			flags.push(objType);
+			channel.shaders[objType] = {};
+			$.each(shaderTypes, function(_,shaderType) {
+				var shflags = flags.clone();
+				shflags.push(shaderType);
+				var args = getShaderProgramArgsForFlags(shflags);
+				args.uniforms = {
+					lightPosTex : 0,
+					lightVelTex : 1
+				};
+				channel.shaders[objType][shaderType] = new GL.ShaderProgram(args);
 			});
 		});
+	});
 
-		unitQuadVertexBuffer = new GL.ArrayBuffer({
-			dim : 2,
-			data : [0, 0, 1, 0, 0, 1, 1, 1]
-		});
+	unitQuadVertexBuffer = new GL.ArrayBuffer({
+		dim : 2,
+		data : [0, 0, 1, 0, 0, 1, 1, 1]
+	});
 
-		//used for off-screen rendering and not part of the scene graph
-		fboQuad = new GL.SceneObject({
+	//used for off-screen rendering and not part of the scene graph
+	fboQuad = new GL.SceneObject({
+		mode : gl.TRIANGLE_STRIP,
+		attrs : {
+			vertex : unitQuadVertexBuffer
+		},
+		parent : null
+	});	
+	
+	var cubeShader = new GL.ShaderProgram({
+		vertexCodeID : 'cube-vsh',
+		fragmentCode : 
+			'precision highp float;\n'
+			+ $('#shader-common').text()
+			+ $('#cube-fsh').text(),
+		uniforms : {
+			skyTex : 0,
+			lightVelTex : 1
+		}
+	});
+
+
+	//scene graph, 6 quads oriented in a cube
+	//I would use a cubemap but the Mali-400 doesn't seem to want to use them as 2D FBO targets ...
+	cubeSides = [];
+	for (var side = 0; side < 6; ++side) {
+		cubeSides[side] = new GL.SceneObject({
 			mode : gl.TRIANGLE_STRIP,
 			attrs : {
 				vertex : unitQuadVertexBuffer
 			},
-			parent : null
-		});	
-		
-		var cubeShader = new GL.ShaderProgram({
-			vertexCodeID : 'cube-vsh',
-			fragmentCode : 
-				'precision highp float;\n'
-				+ $('#shader-common').text()
-				+ $('#cube-fsh').text(),
 			uniforms : {
-				skyTex : 0,
-				lightVelTex : 1
-			}
-		});
-
-
-		//scene graph, 6 quads oriented in a cube
-		//I would use a cubemap but the Mali-400 doesn't seem to want to use them as 2D FBO targets ...
-		cubeSides = [];
-		for (var side = 0; side < 6; ++side) {
-			cubeSides[side] = new GL.SceneObject({
-				mode : gl.TRIANGLE_STRIP,
-				attrs : {
-					vertex : unitQuadVertexBuffer
-				},
-				uniforms : {
-					viewAngle : GL.view.angle,
-					angle : angleForSide[side]
-				},
-				shader : cubeShader,
-				texs : [skyTex, lightPosVelChannels[1].texs[0][side]],
-			});
-		}
-
-		var tmpQ = quat.create();	
-		mouse = new Mouse3D({
-			pressObj : canvas,
-			move : function(dx,dy) {
-				var rotAngle = Math.PI / 180 * .01 * Math.sqrt(dx*dx + dy*dy);
-				quat.setAxisAngle(tmpQ, [dy, dx, 0], rotAngle);
-
-				quat.mul(GL.view.angle, GL.view.angle, tmpQ);
-				quat.normalize(GL.view.angle, GL.view.angle);
+				viewAngle : GL.view.angle,
+				angle : angleForSide[side]
 			},
-			zoom : function(dz) {
-				GL.view.fovY *= Math.exp(-.0003 * dz);
-				GL.view.fovY = Math.clamp(GL.view.fovY, 1, 179);
-				GL.updateProjection();
-			}
+			shader : cubeShader,
+			texs : [skyTex, lightPosVelChannels[1].texs[0][side]],
 		});
+	}
 
-		resetField();
+	var tmpQ = quat.create();	
+	mouse = new Mouse3D({
+		pressObj : canvas,
+		move : function(dx,dy) {
+			var rotAngle = Math.PI / 180 * .01 * Math.sqrt(dx*dx + dy*dy);
+			quat.setAxisAngle(tmpQ, [dy, dx, 0], rotAngle);
 
-		$(window).resize(resize);
-		resize();
-		update();
+			quat.mul(GL.view.angle, GL.view.angle, tmpQ);
+			quat.normalize(GL.view.angle, GL.view.angle);
+		},
+		zoom : function(dz) {
+			GL.view.fovY *= Math.exp(-.0003 * dz);
+			GL.view.fovY = Math.clamp(GL.view.fovY, 1, 179);
+			GL.updateProjection();
+		}
 	});
-});
+
+	resetField();
+
+	$(window).resize(resize);
+	resize();
+	update();
+}
+
 
