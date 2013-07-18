@@ -279,13 +279,17 @@ a:active {
 	</head>
 	<body style='margin:0px; overflow:hidden'>
 		<div id='panel' style='width:400px; position:absolute; background-color:rgba(0,0,0,.25)'>
-			<select id='objectTypes'></select><br>
 			Iteration d/dLambda: <input id='deltaLambda'/><br>
+			<select id='objectTypes'></select><br>
 			Object Distance (m): <input id='objectDist'/><br>
-			Black Hole Mass (kg): <input id='blackHoleMass'/><br>
-			Warp Bubble Thickness: <input id='warpBubbleThickness'/><br>
-			Warp Bubble Velocity (c): <input id='warpBubbleVelocity'/><br>
-			Warp Bubble Radius: <input id='warpBubbleRadius'/><br>
+			<div id="Black_Hole_params">
+				Black Hole Mass (kg): <input id='blackHoleMass'/><br>
+			</div>
+			<div id="Alcubierre_Warp_Drive_Bubble_params">
+				Warp Bubble Thickness: <input id='warpBubbleThickness'/><br>
+				Warp Bubble Velocity (c): <input id='warpBubbleVelocity'/><br>
+				Warp Bubble Radius: <input id='warpBubbleRadius'/><br>
+			</div>		
 			<input type='radio' group='1' onclick='location.href="testcube.html"'>Test Cube</input><br>
 			<input type='radio' group='1' onclick='location.href="index.html"'>Software update</input><br>
 			<input type='radio' group='1' checked>FBO update</input><br>

@@ -235,7 +235,18 @@ function main1() {
 	}).prependTo(document.body).get(0);
 	$(canvas).disableSelection()
 
+	var objectTypeParamDivs = {};
+	var refreshObjectTypeParamDivs = function() {
+		$.each(objectTypeParamDivs, function(divObjectType,objectTypeParamDiv) {
+			if (divObjectType == objectType) {
+				objectTypeParamDiv.show();
+			} else {
+				objectTypeParamDiv.hide();
+			}
+		});
+	};
 	$.each(objectTypes, function(k,v) {
+		objectTypeParamDivs[v] = $('#'+v.replace(new RegExp(' ', 'g'), '_')+'_params');
 		var option = $('<option>', {text:v});
 		option.appendTo($('#objectTypes'));
 		if (v == objectType) {
@@ -244,8 +255,10 @@ function main1() {
 	});
 	$('#objectTypes').change(function() {
 		objectType = $('#objectTypes').val();
+		refreshObjectTypeParamDivs();
 		resetField();
 	});
+	refreshObjectTypeParamDivs();
 
 	$.each([
 		'deltaLambda',
