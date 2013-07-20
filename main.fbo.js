@@ -26,8 +26,6 @@ var lightPosVelChannels = [
 	{flags:['pos']},
 	{flags:['vel']}
 ];
-var unitQuadVertexBuffer;
-var fboQuad;
 
 function stupidPrint(s) {
 	return;
@@ -122,7 +120,7 @@ function resetField() {
 			var fbo = channel.fbos[0][side];
 			fbo.draw({
 				callback:function(){
-					fboQuad.draw({
+					GL.unitQuad.draw({
 						shader:shader,
 						uniforms:uniforms
 					});
@@ -157,7 +155,7 @@ function updateLightPosTex() {
 			var fbo = channel.fbos[1][side];
 			fbo.draw({
 				callback:function(){
-					fboQuad.draw({
+					GL.unitQuad.draw({
 						shader:shader,
 						uniforms:uniforms,
 						texs:[
@@ -390,20 +388,6 @@ function main3(skyTex) {
 		});
 	});
 
-	unitQuadVertexBuffer = new GL.ArrayBuffer({
-		dim : 2,
-		data : [0, 0, 1, 0, 0, 1, 1, 1]
-	});
-
-	//used for off-screen rendering and not part of the scene graph
-	fboQuad = new GL.SceneObject({
-		mode : gl.TRIANGLE_STRIP,
-		attrs : {
-			vertex : unitQuadVertexBuffer
-		},
-		parent : null
-	});	
-	
 	var cubeShader = new GL.ShaderProgram({
 		vertexCodeID : 'cube-vsh',
 		fragmentCode : 
@@ -422,10 +406,8 @@ function main3(skyTex) {
 	cubeSides = [];
 	for (var side = 0; side < 6; ++side) {
 		cubeSides[side] = new GL.SceneObject({
+			geometry : GL.unitQuad,
 			mode : gl.TRIANGLE_STRIP,
-			attrs : {
-				vertex : unitQuadVertexBuffer
-			},
 			uniforms : {
 				viewAngle : GL.view.angle,
 				angle : angleForSide[side]
