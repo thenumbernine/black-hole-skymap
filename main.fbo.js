@@ -400,14 +400,16 @@ function main3(skyTex) {
 		}
 	});
 
-
 	//scene graph, 6 quads oriented in a cube
 	//I would use a cubemap but the Mali-400 doesn't seem to want to use them as 2D FBO targets ...
 	cubeSides = [];
 	for (var side = 0; side < 6; ++side) {
 		cubeSides[side] = new GL.SceneObject({
-			geometry : GL.unitQuad,
+			//geometry : GL.unitQuad.geometry,
 			mode : gl.TRIANGLE_STRIP,
+			attrs : {
+				vertex : GL.unitQuadVertexBuffer
+			},
 			uniforms : {
 				viewAngle : GL.view.angle,
 				angle : angleForSide[side]
