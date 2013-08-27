@@ -184,7 +184,7 @@ function updateLightVelTex() {
 					newVz = oldVz - deltaLambda * MOverR2 * (rMinus2MOverR2 * oldPz * oldVt * oldVt + invR2M * (oldPz * velDotVel - 2 * oldVz * posDotVel));
 					newVt = oldVt + deltaLambda * 2 * MOverR2 * invR2M * posDotVel * oldVt;
 				} else if (objectType == 'Alcubierre Warp Drive Bubble') {
-					var r = Math.sqrt(oldPx * oldPx + oldPy * oldPy + oldPz * oldPz);
+					var r = Math.sqrt((oldPx - objectDist) * (oldPx - objectDist) + oldPy * oldPy + oldPz * oldPz);
 					var sigmaFront = warpBubbleThickness * (r + warpBubbleRadius);
 					var sigmaCenter = warpBubbleThickness * r;
 					var sigmaBack = warpBubbleThickness * (r - warpBubbleRadius);
