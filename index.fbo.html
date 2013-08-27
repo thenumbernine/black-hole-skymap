@@ -136,7 +136,7 @@ void main() {
 // (1 - 2M/r) vt^2 = (vx^2 + vy^2 + vz^2) / (1 - 2M/r)
 // vt^2 = (vx^2 + vy^2 + vz^2) / (1 - 2M/r)^2
 // vt = ||vx,vy,vz|| / (1 - 2M/r)
-	vec3 pos = vel;
+	vec3 pos = vec3(0.);
 	pos.x -= objectDist;
 	float r = length(pos);
 	float oneMinus2MOverR = 1. - 2. * blackHoleMass / r;
@@ -144,15 +144,15 @@ void main() {
 }
 		</script>
 		<script id='Alcubierre_Warp_Drive_Bubble:reset:vel:fsh' type='x-shader/x-fragment'>
-	vec3 pos = vel;
-	float r = length(pos - vec3(objectDist,0.,0.));
-	float sigmaFront = warpBubbleThickness * (r + warpBubbleRadius);
-	float sigmaCenter = warpBubbleThickness * r;
-	float sigmaBack = warpBubbleThickness * (r - warpBubbleRadius);
+	vec3 pos = vec3(0.);
+	float rs = length(pos - vec3(objectDist, 0., 0.));
+	float sigmaFront = warpBubbleThickness * (rs + warpBubbleRadius);
+	float sigmaCenter = warpBubbleThickness * warpBubbleRadius;
+	float sigmaBack = warpBubbleThickness * (rs - warpBubbleRadius);
 	float tanhSigmaCenter = tanh(sigmaCenter);
 	float f = (tanh(sigmaFront) - tanh(sigmaBack)) / (2. * tanhSigmaCenter);
 	float sechDiff = sechSq(sigmaFront) - sechSq(sigmaBack);
-	float dfScalar = sechDiff / (2. * r * tanhSigmaCenter);				
+	float dfScalar = sechDiff / (2. * rs * tanhSigmaCenter);				
 	float vf = f * warpBubbleVelocity;
 	float vf2 = vf * vf;
 	gl_FragColor.w = 
@@ -214,14 +214,14 @@ void main() {
 }
 		</script>
 		<script id='Alcubierre_Warp_Drive_Bubble:iterate:vel:fsh' type='x-shader/x-fragment'>
-	float r = length(pos.xyz);
-	float sigmaFront = warpBubbleThickness * (r + warpBubbleRadius);
-	float sigmaCenter = warpBubbleThickness * r;
-	float sigmaBack = warpBubbleThickness * (r - warpBubbleRadius);
+	float rs = length(pos.xyz - vec3(objectDist, 0., 0.));
+	float sigmaFront = warpBubbleThickness * (rs + warpBubbleRadius);
+	float sigmaCenter = warpBubbleThickness * warpBubbleRadius;
+	float sigmaBack = warpBubbleThickness * (rs - warpBubbleRadius);
 	float tanhSigmaCenter = tanh(sigmaCenter);
 	float f = (tanh(sigmaFront) - tanh(sigmaBack)) / (2. * tanhSigmaCenter);
 	float sechDiff = sechSq(sigmaFront) - sechSq(sigmaBack);
-	float dfScalar = sechDiff / (2. * r * tanhSigmaCenter);
+	float dfScalar = sechDiff / (2. * rs * tanhSigmaCenter);
 	vec4 fv;
 	fv.xyz = warpBubbleThickness * pos.xyz * dfScalar;
 	fv.t = -warpBubbleVelocity * warpBubbleThickness * pos.x * dfScalar;

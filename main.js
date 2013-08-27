@@ -108,7 +108,7 @@ function resetField() {
 					//... later
 					var rs = vec3.dist(pos, vec3.fromValues(objectDist,0,0));	//center is view pos, but rs is measured from bubble origin
 					var sigmaFront = warpBubbleThickness * (rs + warpBubbleRadius);
-					var sigmaCenter = warpBubbleThickness * rs;
+					var sigmaCenter = warpBubbleThickness * warpBubbleRadius;
 					var sigmaBack = warpBubbleThickness * (rs - warpBubbleRadius);
 					var tanhSigmaCenter = tanh(sigmaCenter);
 					var f = (tanh(sigmaFront) - tanh(sigmaBack)) / (2 * tanhSigmaCenter);
@@ -184,14 +184,14 @@ function updateLightVelTex() {
 					newVz = oldVz - deltaLambda * MOverR2 * (rMinus2MOverR2 * oldPz * oldVt * oldVt + invR2M * (oldPz * velDotVel - 2 * oldVz * posDotVel));
 					newVt = oldVt + deltaLambda * 2 * MOverR2 * invR2M * posDotVel * oldVt;
 				} else if (objectType == 'Alcubierre Warp Drive Bubble') {
-					var r = Math.sqrt((oldPx - objectDist) * (oldPx - objectDist) + oldPy * oldPy + oldPz * oldPz);
-					var sigmaFront = warpBubbleThickness * (r + warpBubbleRadius);
-					var sigmaCenter = warpBubbleThickness * r;
-					var sigmaBack = warpBubbleThickness * (r - warpBubbleRadius);
+					var rs = Math.sqrt((oldPx - objectDist) * (oldPx - objectDist) + oldPy * oldPy + oldPz * oldPz);
+					var sigmaFront = warpBubbleThickness * (rs + warpBubbleRadius);
+					var sigmaCenter = warpBubbleThickness * warpBubbleRadius;
+					var sigmaBack = warpBubbleThickness * (rs - warpBubbleRadius);
 					var tanhSigmaCenter = tanh(sigmaCenter);
 					var f = (tanh(sigmaFront) - tanh(sigmaBack)) / (2 * tanhSigmaCenter);
 					var sechDiff = sechSq(sigmaFront) - sechSq(sigmaBack);
-					var dfScalar = sechDiff / (2 * r * tanhSigmaCenter);
+					var dfScalar = sechDiff / (2 * rs * tanhSigmaCenter);
 					var ft = -warpBubbleVelocity * warpBubbleThickness * oldPx * dfScalar;
 					var fx = warpBubbleThickness * oldPx * dfScalar;
 					var fy = warpBubbleThickness * oldPy * dfScalar;

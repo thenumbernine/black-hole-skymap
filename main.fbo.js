@@ -75,7 +75,7 @@ function getShaderProgramArgsForFlags(flags) {
 	fshFlags.push('fsh');
 	var fragmentCode = getScriptForFlags(fshFlags);
 
-	fragmentCode = 'precision highp float;\n' + $('#shader-common').text() + fragmentCode;
+	fragmentCode = $('#shader-common').text() + fragmentCode;
 
 	return {
 		vertexCode : vertexCode,
@@ -383,6 +383,8 @@ function main3(skyTex) {
 					lightPosTex : 0,
 					lightVelTex : 1
 				};
+				args.vertexPrecision = 'best';
+				args.fragmentPrecision = 'best';
 				channel.shaders[objType][shaderType] = new GL.ShaderProgram(args);
 			});
 		});
@@ -391,13 +393,14 @@ function main3(skyTex) {
 	var cubeShader = new GL.ShaderProgram({
 		vertexCodeID : 'cube-vsh',
 		fragmentCode : 
-			'precision highp float;\n'
-			+ $('#shader-common').text()
+			$('#shader-common').text()
 			+ $('#cube-fsh').text(),
 		uniforms : {
 			skyTex : 0,
 			lightVelTex : 1
-		}
+		},
+		vertexPrecision : 'best',
+		fragmentPrecision : 'best'
 	});
 
 	//scene graph, 6 quads oriented in a cube
