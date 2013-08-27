@@ -80,7 +80,7 @@ void main() {
 	gl_Position = vec4(vertex * 2. - 1., 0., 1.);
 }
 		</script>
-		<script id='Black_Hole:Alcubierre_Warp_Drive_Bubble:reset:pos:fsh' type='x-shader/x-fragment'>
+		<script id='Black_Hole:reset:pos:fsh' type='x-shader/x-fragment'>
 #extension GL_OES_texture_float : enable
 varying vec3 vtxv;
 uniform float objectDist;
@@ -88,6 +88,16 @@ void main() {
 	vec3 dir = normalize(vtxv);
 	gl_FragColor.xyz = dir;
 	gl_FragColor.x -= objectDist;
+	gl_FragColor.w = 0.;
+}
+		</script>
+		<script id='Alcubierre_Warp_Drive_Bubble:reset:pos:fsh' type='x-shader/x-fragment'>
+#extension GL_OES_texture_float : enable
+varying vec3 vtxv;
+uniform float objectDist;
+void main() {
+	vec3 dir = normalize(vtxv);
+	gl_FragColor.xyz = dir;
 	gl_FragColor.w = 0.;
 }
 		</script>
@@ -126,7 +136,7 @@ void main() {
 	pos.x -= objectDist;
 	float r = length(pos);
 	float sigmaFront = warpBubbleThickness * (r + warpBubbleRadius);
-	float sigmaCenter = warpBubbleThickness * r;
+	float sigmaCenter = warpBubbleThickness * warpBubbleRadius;
 	float sigmaBack = warpBubbleThickness * (r - warpBubbleRadius);
 	float tanhSigmaCenter = tanh(sigmaCenter);
 	float f = (tanh(sigmaFront) - tanh(sigmaBack)) / (2. * tanhSigmaCenter);
@@ -193,9 +203,9 @@ void main() {
 }
 		</script>
 		<script id='Alcubierre_Warp_Drive_Bubble:iterate:vel:fsh' type='x-shader/x-fragment'>
-	float r = length(pos.xyz);
+	float r = length(pos.xyz - vec3(objectDist, 0., 0.));
 	float sigmaFront = warpBubbleThickness * (r + warpBubbleRadius);
-	float sigmaCenter = warpBubbleThickness * r;
+	float sigmaCenter = warpBubbleThickness * warpBubbleRadius;
 	float sigmaBack = warpBubbleThickness * (r - warpBubbleRadius);
 	float tanhSigmaCenter = tanh(sigmaCenter);
 	float f = (tanh(sigmaFront) - tanh(sigmaBack)) / (2. * tanhSigmaCenter);
@@ -203,25 +213,25 @@ void main() {
 	float dfScalar = sechDiff / (2. * r * tanhSigmaCenter);
 	vec4 fv;
 	fv.xyz = warpBubbleThickness * pos.xyz * dfScalar;
-	fv.t = -warpBubbleVelocity * warpBubbleThickness * pos.x * dfScalar;
-	gl_FragColor.x = vel.x - deltaLambda * ((f * f * f * fv.x * warpBubbleVelocity * warpBubbleVelocity * warpBubbleVelocity * warpBubbleVelocity - f * fv.x * warpBubbleVelocity * warpBubbleVelocity - fv.t * warpBubbleVelocity) * vel.t * vel.t
-		- 2. * f * f * fv.x * warpBubbleVelocity * warpBubbleVelocity * warpBubbleVelocity * vel.t * vel.x
-		- 2. * (f * f * fv.y * warpBubbleVelocity * warpBubbleVelocity * warpBubbleVelocity + fv.y * warpBubbleVelocity) / 2. * vel.t * vel.y
-		- 2. * (f * f * fv.z * warpBubbleVelocity * warpBubbleVelocity * warpBubbleVelocity + fv.z * warpBubbleVelocity) / 2. * vel.t * vel.z
+	fv.w = -warpBubbleVelocity * warpBubbleThickness * pos.x * dfScalar;
+	gl_FragColor.x = vel.x - deltaLambda * ((f * f * f * fv.x * warpBubbleVelocity * warpBubbleVelocity * warpBubbleVelocity * warpBubbleVelocity - f * fv.x * warpBubbleVelocity * warpBubbleVelocity - fv.w * warpBubbleVelocity) * vel.w * vel.w
+		- 2. * f * f * fv.x * warpBubbleVelocity * warpBubbleVelocity * warpBubbleVelocity * vel.w * vel.x
+		- 2. * (f * f * fv.y * warpBubbleVelocity * warpBubbleVelocity * warpBubbleVelocity + fv.y * warpBubbleVelocity) / 2. * vel.w * vel.y
+		- 2. * (f * f * fv.z * warpBubbleVelocity * warpBubbleVelocity * warpBubbleVelocity + fv.z * warpBubbleVelocity) / 2. * vel.w * vel.z
 		+ f * fv.x * warpBubbleVelocity * warpBubbleVelocity * vel.x * vel.x
 		+ 2. * f * fv.y * warpBubbleVelocity * warpBubbleVelocity / 2. * vel.x * vel.y
 		+ 2. * f * fv.z * warpBubbleVelocity * warpBubbleVelocity / 2. * vel.x * vel.z
 	);
-	gl_FragColor.y = vel.y + deltaLambda * (f * fv.y * warpBubbleVelocity * warpBubbleVelocity * vel.t * vel.t
-		+ 2. * fv.y * warpBubbleVelocity / 2. * vel.t * vel.x
+	gl_FragColor.y = vel.y + deltaLambda * (f * fv.y * warpBubbleVelocity * warpBubbleVelocity * vel.w * vel.w
+		+ 2. * fv.y * warpBubbleVelocity / 2. * vel.w * vel.x
 	);
-	gl_FragColor.z = vel.z + deltaLambda * (f * fv.z * warpBubbleVelocity * warpBubbleVelocity * vel.t * vel.t
-		+ 2. * fv.z * warpBubbleVelocity / 2. * vel.t * vel.x
+	gl_FragColor.z = vel.z + deltaLambda * (f * fv.z * warpBubbleVelocity * warpBubbleVelocity * vel.w * vel.w
+		+ 2. * fv.z * warpBubbleVelocity / 2. * vel.w * vel.x
 	);
-	gl_FragColor.w = vel.t - deltaLambda * (f * f * fv.x * warpBubbleVelocity * warpBubbleVelocity * warpBubbleVelocity * vel.t * vel.t
-		- 2. * f * fv.x * warpBubbleVelocity * warpBubbleVelocity * vel.t * vel.x
-		- 2. * f * fv.y * warpBubbleVelocity * warpBubbleVelocity / 2. * vel.t * vel.y
-		- 2. * f * fv.z * warpBubbleVelocity * warpBubbleVelocity / 2. * vel.t * vel.z
+	gl_FragColor.w = vel.w - deltaLambda * (f * f * fv.x * warpBubbleVelocity * warpBubbleVelocity * warpBubbleVelocity * vel.w * vel.w
+		- 2. * f * fv.x * warpBubbleVelocity * warpBubbleVelocity * vel.w * vel.x
+		- 2. * f * fv.y * warpBubbleVelocity * warpBubbleVelocity / 2. * vel.w * vel.y
+		- 2. * f * fv.z * warpBubbleVelocity * warpBubbleVelocity / 2. * vel.w * vel.z
 		+ fv.x * warpBubbleVelocity * vel.x * vel.x
 		+ 2. * fv.y * warpBubbleVelocity / 2. * vel.x * vel.y
 		+ 2. * fv.z * warpBubbleVelocity / 2. * vel.x * vel.z
