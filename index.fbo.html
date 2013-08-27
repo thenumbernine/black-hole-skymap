@@ -97,18 +97,14 @@ void main() {
 varying vec3 vtxv;
 uniform float objectDist;
 void main() {
-	vec3 dir = normalize(vtxv);
-	gl_FragColor.xyz = dir;
+	gl_FragColor = vec4(0.);
 	gl_FragColor.x -= objectDist;
-	gl_FragColor.w = 0.;
 }
 		</script>
 		<script id='Alcubierre_Warp_Drive_Bubble:reset:pos:fsh' type='x-shader/x-fragment'>
 varying vec3 vtxv;
 void main() {
-	vec3 dir = normalize(vtxv);
-	gl_FragColor.xyz = dir;
-	gl_FragColor.w = 0.;
+	gl_FragColor = vec4(0.);
 }
 		</script>
 		<script id='Black_Hole:reset:vel:fsh' type='x-shader/x-fragment'>
@@ -134,8 +130,7 @@ void main() {
 // (1 - 2M/r) vt^2 = (vx^2 + vy^2 + vz^2) / (1 - 2M/r)
 // vt^2 = (vx^2 + vy^2 + vz^2) / (1 - 2M/r)^2
 // vt = ||vx,vy,vz|| / (1 - 2M/r)
-	vec3 pos = vec3(0.);
-	pos.x -= objectDist;
+	vec3 pos = vec3(-objectDist, 0., 0.);
 	float r = length(pos);
 	float oneMinus2MOverR = 1. - 2. * blackHoleMass / r;
 	gl_FragColor.w = 1. / oneMinus2MOverR;
@@ -211,7 +206,8 @@ void main() {
 }
 		</script>
 		<script id='Alcubierre_Warp_Drive_Bubble:iterate:vel:fsh' type='x-shader/x-fragment'>
-	float rs = length(pos.xyz - vec3(objectDist, 0., 0.));
+	float rs = sqrt(dot(pos,pos) + objectDist * (-2. * pos.x + objectDist) );
+	//float rs = length(pos.xyz - vec3(objectDist, 0., 0.));
 	float sigmaFront = warpBubbleThickness * (rs + warpBubbleRadius);
 	float sigmaCenter = warpBubbleThickness * warpBubbleRadius;
 	float sigmaBack = warpBubbleThickness * (rs - warpBubbleRadius);

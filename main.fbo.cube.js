@@ -298,7 +298,7 @@ $(document).ready(function(){
 
 	$.each(lightPosVelChannels, function(_,channel) {
 		//working on how to organize this
-		channel.uniforms = ['blackHoleMass', 'warpDriveThickness', 'warpDriveRadius', 'warpDriveVelocity', 'objectDist', 'deltaLambda'];
+		channel.uniforms = ['blackHoleMass', 'warpBubbleThickness', 'warpBubbleRadius', 'warpBubbleVelocity', 'objectDist', 'deltaLambda'];
 		
 		channel.texs = [];
 		channel.fbos = [];
