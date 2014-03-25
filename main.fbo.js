@@ -397,11 +397,64 @@ function main3(skyTex) {
 		});
 	});
 
+	var shaderCommonCode = mlstr(function(){/*
+float tanh(float x) {
+	float exp2x = exp(2. * x);
+	return (exp2x - 1.) / (exp2x + 1.);
+}
+
+float sech(float x) {
+	float expx = exp(x);
+	return 2. * expx / (expx * expx + 1.);
+}
+
+float sechSq(float x) {
+	float y = sech(x);
+	return y * y;
+}
+*/});
+
 	var cubeShader = new GL.ShaderProgram({
-		vertexCodeID : 'cube-vsh',
-		fragmentCode : 
-			$('#shader-common').text()
-			+ $('#cube-fsh').text(),
+		vertexCode : mlstr(function(){/*
+attribute vec2 vertex;
+varying vec2 uv;
+uniform mat4 projMat;
+uniform vec4 angle;
+const mat3 viewMatrix = mat3(
+	0., 0., -1.,
+	1., 0., 0., 
+	0., -1., 0.);
+vec3 qtransform( vec4 q, vec3 v ){ 
+	return v + 2.0*cross(cross(v, q.xyz ) + q.w*v, q.xyz);
+}
+void main() {
+	uv = vertex;
+	vec3 vtx3 = vec3(vertex * 2. - 1., 1.);
+	vtx3 = qtransform(angle, vtx3);
+	vtx3 = viewMatrix * vtx3;
+	vec4 vtx4 = vec4(vtx3, 1.);
+	gl_Position = projMat * vtx4;
+}
+*/}),
+		fragmentCode : shaderCommonCode + mlstr(function(){/*
+varying vec2 uv;
+uniform samplerCube skyTex;
+uniform sampler2D lightVelTex;
+uniform vec4 viewAngle;
+const mat3 viewMatrixInv = mat3(
+	0., 1., 0.,
+	0., 0., -1.,
+	-1., 0., 0.);
+vec3 qtransform( vec4 q, vec3 v ){ 
+	return v + 2.0*cross(cross(v, q.xyz) + q.w*v, q.xyz);
+}
+void main() {
+	vec3 dir = texture2D(lightVelTex, uv).xyz;
+	dir = viewMatrixInv * viewMatrixInv * dir;
+	dir = qtransform(vec4(viewAngle.xyz, -viewAngle.w), dir);
+	gl_FragColor.xyz = textureCube(skyTex, dir).xyz;
+	gl_FragColor.w = 1.; 
+}*/}),
 		uniforms : {
 			skyTex : 0,
 			lightVelTex : 1

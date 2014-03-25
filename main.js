@@ -404,8 +404,41 @@ function main3(skyTex) {
 	resetField();
 
 	var cubeShader = new GL.ShaderProgram({
-		vertexCodeID : 'cube-vsh',
-		fragmentCodeID : 'cube-fsh',
+		vertexPrecision : 'best',
+		vertexCode : mlstr(function(){/*
+attribute vec3 vertex;
+varying vec3 vertexv;
+uniform mat4 projMat;
+const mat3 viewMatrixInv = mat3(
+	0., 1., 0.,
+	0., 0., -1.,
+	-1., 0., 0.);
+void main() {
+	vertexv = viewMatrixInv * vertex;
+	gl_Position = projMat * vec4(vertex, 1.);
+}
+*/}),
+		fragmentPrecision : 'best',
+		fragmentCode : mlstr(function(){/*
+varying vec3 vertexv;
+uniform samplerCube skyTex;
+uniform samplerCube lightVelTex;
+const mat3 viewMatrix = mat3(
+	0., 0., -1.,
+	1., 0., 0., 
+	0., -1., 0.);
+
+uniform vec4 viewAngle;
+vec3 qtransform( vec4 q, vec3 v ){ 
+	return v + 2.0*cross(cross(v, q.xyz ) + q.w*v, q.xyz);
+}
+void main() {
+	vec3 dir = textureCube(lightVelTex, vertexv).xyz * 2. - 1.;
+	dir = qtransform(vec4(viewAngle.xyz, -viewAngle.w), viewMatrix * dir);
+	gl_FragColor = textureCube(skyTex, dir);
+	gl_FragColor.w = 1.; 
+}
+*/}),
 		uniforms : {
 			skyTex : 0,
 			lightVelTex : 1,
