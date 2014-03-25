@@ -27,6 +27,24 @@ var lightPosVelChannels = [
 	{flags:['vel']}
 ];
 
+var shaderCommonCode = mlstr(function(){/*
+float tanh(float x) {
+	float exp2x = exp(2. * x);
+	return (exp2x - 1.) / (exp2x + 1.);
+}
+
+float sech(float x) {
+	float expx = exp(x);
+	return 2. * expx / (expx * expx + 1.);
+}
+
+float sechSq(float x) {
+	float y = sech(x);
+	return y * y;
+}
+*/});
+
+
 function stupidPrint(s) {
 	return;
 	$.each(s.split('\n'), function(_,l) {
@@ -34,16 +52,224 @@ function stupidPrint(s) {
 	});
 }
 
+var shaderScriptParts = [
+	{
+		flags : 'Black_Hole:Alcubierre_Warp_Drive_Bubble:reset:pos:vel:vsh',
+		code : mlstr(function(){/*
+attribute vec2 vertex;
+varying vec3 vtxv;
+uniform mat3 rotation;
+void main() {
+	vtxv = rotation * vec3(vertex * 2. - 1., 1.);
+	gl_Position = vec4(vertex * 2. - 1., 0., 1.);
+}
+*/})
+	},
+	{
+		flags : 'Black_Hole:reset:pos:fsh',
+		code : mlstr(function(){/*
+varying vec3 vtxv;
+uniform float objectDist;
+void main() {
+	gl_FragColor = vec4(0.);
+	gl_FragColor.x -= objectDist;
+}
+*/})
+	},
+	{
+		flags : 'Alcubierre_Warp_Drive_Bubble:reset:pos:fsh',
+		code : mlstr(function(){/*
+varying vec3 vtxv;
+void main() {
+	gl_FragColor = vec4(0.);
+}
+*/})
+	},
+	{
+		flags : 'Black_Hole:reset:vel:fsh',
+		code : mlstr(function(){/*
+uniform float objectDist;
+uniform float blackHoleMass;
+*/})
+	},
+	{
+		flags : 'Alcubierre_Warp_Drive_Bubble:reset:vel:fsh',
+		code : mlstr(function(){/*
+uniform float objectDist;
+uniform float warpBubbleThickness;
+uniform float warpBubbleVelocity;
+uniform float warpBubbleRadius;
+*/})
+	},
+	{
+		flags : 'Black_Hole:Alcubierre_Warp_Drive_Bubble:reset:vel:fsh',
+		code : mlstr(function(){/*
+varying vec3 vtxv;
+void main() {
+	vec3 vel = normalize(vtxv);
+	gl_FragColor.xyz = vel;
+*/})
+	},
+	{
+		flags : 'Black_Hole:reset:vel:fsh',
+		code : mlstr(function(){/*
+//when initializing our metric:
+//g_ab v^a v^b = 0 for our metric g
+// (-1 + 2M/r) vt^2 + (vx^2 + vy^2 + vz^2) / (1 - 2M/r) = 0
+// (1 - 2M/r) vt^2 = (vx^2 + vy^2 + vz^2) / (1 - 2M/r)
+// vt^2 = (vx^2 + vy^2 + vz^2) / (1 - 2M/r)^2
+// vt = ||vx,vy,vz|| / (1 - 2M/r)
+	vec3 pos = vec3(-objectDist, 0., 0.);
+	float r = length(pos);
+	float oneMinus2MOverR = 1. - 2. * blackHoleMass / r;
+	gl_FragColor.w = 1. / oneMinus2MOverR;
+}
+*/})
+	},
+	{
+		flags : 'Alcubierre_Warp_Drive_Bubble:reset:vel:fsh',
+		code : mlstr(function(){/*
+	vec3 pos = vec3(0.);
+	float rs = length(pos - vec3(objectDist, 0., 0.));
+	float sigmaFront = warpBubbleThickness * (rs + warpBubbleRadius);
+	float sigmaCenter = warpBubbleThickness * warpBubbleRadius;
+	float sigmaBack = warpBubbleThickness * (rs - warpBubbleRadius);
+	float tanhSigmaCenter = tanh(sigmaCenter);
+	float f = (tanh(sigmaFront) - tanh(sigmaBack)) / (2. * tanhSigmaCenter);
+	float sechDiff = sechSq(sigmaFront) - sechSq(sigmaBack);
+	float dfScalar = sechDiff / (2. * rs * tanhSigmaCenter);				
+	float vf = f * warpBubbleVelocity;
+	float vf2 = vf * vf;
+	gl_FragColor.w = 
+		(warpBubbleVelocity * f + sqrt(
+			vf2 * (1. + vel.x * vel.x) + 1.
+		)) / (-1. + vf2);
+}
+*/})
+	},
+	{
+		flags : 'Black_Hole:Alcubierre_Warp_Drive_Bubble:iterate:pos:vel:vsh',
+		code : mlstr(function(){/*
+attribute vec2 vertex;
+varying vec2 uv;
+varying vec3 vtxv;
+uniform mat3 rotation;
+void main() {
+	uv = vertex;
+	vtxv = rotation * vec3(vertex * 2. - 1., 1.);
+	gl_Position = vec4(vertex * 2. - 1., 0., 1.);
+}
+*/})
+	},
+	{
+		flags : 'Black_Hole:Alcubierre_Warp_Drive_Bubble:iterate:pos:vel:fsh',
+		code : mlstr(function(){/*
+varying vec2 uv;
+varying vec3 vtxv;
+uniform float deltaLambda;
+uniform float objectDist;
+uniform sampler2D lightPosTex;
+uniform sampler2D lightVelTex;
+*/})
+	},
+	{
+		flags : 'Black_Hole:iterate:vel:fsh',
+		code : mlstr(function(){/*
+uniform float blackHoleMass;
+*/})
+	},
+	{
+		flags : 'Alcubierre_Warp_Drive_Bubble:iterate:vel:fsh',
+		code : mlstr(function(){/*
+uniform float warpBubbleThickness;
+uniform float warpBubbleRadius;
+uniform float warpBubbleVelocity;
+*/})
+	},
+	{
+		flags : 'Black_Hole:Alcubierre_Warp_Drive_Bubble:iterate:pos:vel:fsh',
+		code : mlstr(function(){/*
+void main() {
+	vec4 pos = texture2D(lightPosTex, uv);
+	vec4 vel = texture2D(lightVelTex, uv);
+
+*/})
+	},
+	{
+		flags : 'Black_Hole:Alcubierre_Warp_Drive_Bubble:iterate:pos:fsh',
+		code : mlstr(function(){/*
+	gl_FragColor = pos + deltaLambda * vel;
+}
+*/})
+	},
+	{
+		flags : 'Black_Hole:iterate:vel:fsh',
+		code : mlstr(function(){/*
+	float r = length(pos.xyz);
+	float oneMinus2MOverR = 1. - 2.*blackHoleMass/r;			
+	float posDotVel = dot(pos.xyz, vel.xyz);
+	float velDotVel = dot(vel.xyz, vel.xyz);
+	float r2 = r * r;
+	float invR2M = 1. / (r * oneMinus2MOverR);
+	float rMinus2MOverR2 = oneMinus2MOverR / r;
+	float MOverR2 = blackHoleMass / r2;
+	gl_FragColor.x = vel.x - deltaLambda * MOverR2 * (rMinus2MOverR2 * pos.x * vel.w * vel.w + invR2M * (pos.x * velDotVel - 2. * vel.x * posDotVel));
+	gl_FragColor.y = vel.y - deltaLambda * MOverR2 * (rMinus2MOverR2 * pos.y * vel.w * vel.w + invR2M * (pos.y * velDotVel - 2. * vel.y * posDotVel));
+	gl_FragColor.z = vel.z - deltaLambda * MOverR2 * (rMinus2MOverR2 * pos.z * vel.w * vel.w + invR2M * (pos.z * velDotVel - 2. * vel.z * posDotVel));
+	gl_FragColor.w = vel.w + deltaLambda * 2. * MOverR2 * invR2M * posDotVel * vel.w;
+}
+*/})
+	},
+	{
+		flags : 'Alcubierre_Warp_Drive_Bubble:iterate:vel:fsh',
+		code : mlstr(function(){/*
+	float rs = sqrt(dot(pos,pos) + objectDist * (-2. * pos.x + objectDist) );
+	//float rs = length(pos.xyz - vec3(objectDist, 0., 0.));
+	float sigmaFront = warpBubbleThickness * (rs + warpBubbleRadius);
+	float sigmaCenter = warpBubbleThickness * warpBubbleRadius;
+	float sigmaBack = warpBubbleThickness * (rs - warpBubbleRadius);
+	float tanhSigmaCenter = tanh(sigmaCenter);
+	float f = (tanh(sigmaFront) - tanh(sigmaBack)) / (2. * tanhSigmaCenter);
+	float sechDiff = sechSq(sigmaFront) - sechSq(sigmaBack);
+	float dfScalar = sechDiff / (2. * rs * tanhSigmaCenter);
+	vec4 fv;
+	fv.xyz = warpBubbleThickness * pos.xyz * dfScalar;
+	fv.w = -warpBubbleVelocity * warpBubbleThickness * pos.x * dfScalar;
+	gl_FragColor.w = vel.w - deltaLambda * (f * f * fv.x * warpBubbleVelocity * warpBubbleVelocity * warpBubbleVelocity * vel.w * vel.w
+		- 2. * f * fv.x * warpBubbleVelocity * warpBubbleVelocity * vel.w * vel.x
+		- 2. * f * fv.y * warpBubbleVelocity * warpBubbleVelocity / 2. * vel.w * vel.y
+		- 2. * f * fv.z * warpBubbleVelocity * warpBubbleVelocity / 2. * vel.w * vel.z
+		+ fv.x * warpBubbleVelocity * vel.x * vel.x
+		+ 2. * fv.y * warpBubbleVelocity / 2. * vel.x * vel.y
+		+ 2. * fv.z * warpBubbleVelocity / 2. * vel.x * vel.z
+	);
+	gl_FragColor.x = vel.x - deltaLambda * ((f * f * f * fv.x * warpBubbleVelocity * warpBubbleVelocity * warpBubbleVelocity * warpBubbleVelocity - f * fv.x * warpBubbleVelocity * warpBubbleVelocity - fv.w * warpBubbleVelocity) * vel.w * vel.w
+		- 2. * f * f * fv.x * warpBubbleVelocity * warpBubbleVelocity * warpBubbleVelocity * vel.w * vel.x
+		- 2. * (f * f * fv.y * warpBubbleVelocity * warpBubbleVelocity * warpBubbleVelocity + fv.y * warpBubbleVelocity) / 2. * vel.w * vel.y
+		- 2. * (f * f * fv.z * warpBubbleVelocity * warpBubbleVelocity * warpBubbleVelocity + fv.z * warpBubbleVelocity) / 2. * vel.w * vel.z
+		+ f * fv.x * warpBubbleVelocity * warpBubbleVelocity * vel.x * vel.x
+		+ 2. * f * fv.y * warpBubbleVelocity * warpBubbleVelocity / 2. * vel.x * vel.y
+		+ 2. * f * fv.z * warpBubbleVelocity * warpBubbleVelocity / 2. * vel.x * vel.z
+	);
+	gl_FragColor.y = vel.y + deltaLambda * (f * fv.y * warpBubbleVelocity * warpBubbleVelocity * vel.w * vel.w
+		+ 2. * fv.y * warpBubbleVelocity / 2. * vel.w * vel.x
+	);
+	gl_FragColor.z = vel.z + deltaLambda * (f * fv.z * warpBubbleVelocity * warpBubbleVelocity * vel.w * vel.w
+		+ 2. * fv.z * warpBubbleVelocity / 2. * vel.w * vel.x
+	);
+}
+*/})
+	}
+];
+
 function getScriptForFlags(flags) {
 	flags = flags.clone();
 	for (var i = 0; i < flags.length; ++i) {
 		flags[i] = flags[i].replace(new RegExp(' ', 'g'), '_');
 	}
 	var code = '';
-	$('script').each(function(index) {
-		var id = $(this).attr('id');
-		if (id === undefined) return;	//continue;
-		var parts = id.split(':');
+	$.each(shaderScriptParts, function(index, shaderScriptPart) {
+		var parts = shaderScriptPart.flags.split(':');
 		//if all flags are found in parts then use this shader
 		//multiple concatenations? maybe later
 		var failed = false;
@@ -56,10 +282,9 @@ function getScriptForFlags(flags) {
 		if (failed) {
 			return;	//continue;
 		}
-		var text = $(this).text();
+		var text = shaderScriptPart.code;
 		stupidPrint('adding '+text);
 		code += text; 
-		//return false;	//break;
 	});
 	if (code == '') throw "couldn't find code for flags "+flags.join(':');
 	stupidPrint('building '+flags.join(':')+' and getting '+code);
@@ -75,7 +300,7 @@ function getShaderProgramArgsForFlags(flags) {
 	fshFlags.push('fsh');
 	var fragmentCode = getScriptForFlags(fshFlags);
 
-	fragmentCode = $('#shader-common').text() + fragmentCode;
+	fragmentCode = shaderCommonCode + fragmentCode;
 
 	return {
 		vertexCode : vertexCode,
@@ -396,23 +621,6 @@ function main3(skyTex) {
 			});
 		});
 	});
-
-	var shaderCommonCode = mlstr(function(){/*
-float tanh(float x) {
-	float exp2x = exp(2. * x);
-	return (exp2x - 1.) / (exp2x + 1.);
-}
-
-float sech(float x) {
-	float expx = exp(x);
-	return 2. * expx / (expx * expx + 1.);
-}
-
-float sechSq(float x) {
-	float y = sech(x);
-	return y * y;
-}
-*/});
 
 	var cubeShader = new GL.ShaderProgram({
 		vertexCode : mlstr(function(){/*
