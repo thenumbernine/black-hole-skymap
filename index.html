@@ -56,17 +56,41 @@ _gaq.push(['_trackPageview']);
 			
 			<br>
 			<h3>Light and Geodesics</h3>
-			Light travels in a straight line.  Turns out the spacetime that light travels through is curved.
-			So how does one find the path that light travels through spacetime?  Enter geodesics.
-			Geodesics calculate the path that a straight line takes over an arbitrarily curved surface.<br>
+			Light travels in a straight line.  Let's represent the position of a particle of light as \(x^\mu\), for \(\mu\) running over indexes 0, 1, 2, 3.
+			\(x^0 = t\) will represent the position in time of the particle. \(x^i\), for i running 1 through 3, will represent the coordinate in 3D space of the particle.
+			\(x^1\) will represent the x coordinate, \(x^2 = y\), and \(x^3 = z\).<br>
 			<br>
-			The general equation is described as:
-			\( {\dot x}^\mu = {\Gamma^\mu}_{\alpha \beta} {\ddot x}^\alpha {\ddot x}^\beta \)
-			where \(x^\mu\) is our light particle coordinates in spacetime, and \( {\Gamma^\mu}_{\alpha \beta} \) is our Christoffel Symbol of the Second Kind.
-			This gives us a relation between the acceleration and the velocity of our test particle travelling across the geodesic.
-			It turns out the coefficients of the relation stored in \( {\Gamma^\mu}_{\alpha \beta} \) tend to be based on the particle position as well.
-			In the end we get a formula for computing the acceleration based on the position and velocity of the particle.<br>
+			From a stationary observer a light particle appears to travel through time.  Let \(\tau\) represent the observer's position in time.
+			The change in the light particle's position (in space and time) with respect to the change in the observer's time (the velocity in the observer's rest frame) can be represented as \({d \over {d\tau}} x^\mu\), or \({\dot x}^\mu\) for short.
+			This appearance of velocity is only present to the observer, of course.
+			To the particle of light in its own rest frame, it is simultaneously existing in all locations.
+			For more on that check out the page on <a href='/time-dilation'>time dilation</a>.<br>
 			<br>
+			Turns out the spacetime that light travels through is not flat, but curved.
+			Curved geometry is described in terms of its line element, \(ds^s = g_{\mu\nu} dx^\mu dx^\nu \), for \(g_{\mu\nu}\) the metric tensor.<br>
+			<br>
+			So how does one find the coordinates of path that light travels through a curved spacetime?  Enter the world of geodesics.
+			Geodesics calculate the path that a straight line takes over an arbitrarily curved surface.
+			The geodesic equation is described as
+			\( {\ddot x}^\mu + {\Gamma^\mu}_{\alpha \beta} {\dot x}^\alpha {\dot x}^\beta = 0 \)
+			where \( {\Gamma^\mu}_{\alpha \beta} \) is the Christoffel Symbol of the Second Kind.<br>
+			<br>
+			The Christoffel Symbol of the Second Kind can be defined as \( {\Gamma^\mu}_{\alpha \beta} = g^{\mu\nu} \Gamma_{\nu \alpha \beta} \),
+			for \(g^{\mu\nu}\) the inverse of the metric tensor and for \( {\Gamma_{\nu \alpha \beta}} \) the Christoffel Symbol of the First Kind.
+			The Christoffel Symbol of the First Kind is then defined as \( \Gamma_{\alpha \beta \gamma} = {1 \over 2} (g_{\alpha \beta, \gamma} + g_{\alpha \gamma, \beta} - g_{\beta \gamma, \alpha})\)
+			for comma derivative shorthand \(g_{\alpha \beta, \gamma} = {d \over {d {x^\gamma}}} g_{\alpha \beta}\).<br>
+			<br>
+			The geodesic equation gives us a relation between the first and second derivatives of the coordinates our test particle travelling along the geodesic.
+			It turns out the coefficients of the relation stored in \( {\Gamma^\mu}_{\alpha \beta} \) tend to be based on the particle position \(x^\mu\) as well.
+			In the end we get a formula for computing \({\ddot x}^\mu\) based on the \(x^\mu\) and \({\dot x}^\mu\).<br>
+			<br>
+			<h3>Implementation</h3>
+			Once we have these relations we can approximate them by simulating the position and velocity of light particles at arbitrary samples on the screen. 
+			The positions and velocities are updated using your favorite numeric integration method with the following equations:
+\( {d \over {d\tau}} \left[ \matrix { x^\mu \\ {\dot x}^\mu } \right]
+= \left[ \matrix{ {\dot x}^\mu \\ {\ddot x}^\mu } \right]
+= \left[ \matrix{ {\dot x}^\mu \\ -{\Gamma^\mu}_{\alpha \beta} {\dot x}^\alpha {\dot x}^\beta } \right]
+\).
 			<h3>Schwarzschild Geodesic</h3>
 			The Schwarzschild metric describes the curvature of spacetime around a spherically separate object.
 			The metric is given as \( {ds}^2 = -(1 - {2 M \over r}) {dt}^2 + (1 - {2 M \over r})^{-1} ({dx}^2 + {dy}^2 + {dz}^2) \)
