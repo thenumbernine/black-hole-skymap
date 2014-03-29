@@ -1,95 +1,13 @@
 <!DOCTYPE html>
 <html>
 	<head>
-		<meta charset="UTF-8">
 		<title>Black Hole Iterative Skymap - WebGL</title>
-		<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-		<meta name="apple-mobile-web-app-capable" content="yes"/>
-		<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
-
 		<link rel='stylesheet' type='text/css' href='style.css'/>
-		<script type='text/javascript' src='/js/jquery-1.10.0.min.js'></script>
-		<script type='text/javascript' src='/js/util.js'></script>
-		<script type='text/javascript' src='/js/gl-matrix.2.2.0.min.js'></script>
-		<script type='text/javascript' src='/js/gl-util.js'></script>
-		<script type='text/javascript' src='/js/gl-util-unitquad.js'></script>
-		<script type='text/javascript' src='/js/gl-util-kernel.js'></script>
-		<script type='text/javascript' src='/js/mouse3d.js'></script>
-		<script type="text/javascript" src="http://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
-		<script type='text/javascript' src='main.fbo.js'></script>
-		
-<script type='text/javascript'>
-var _gaq = _gaq || [];
-_gaq.push(['_setAccount', 'UA-17312646-1']);
-_gaq.push(['_trackPageview']);
-(function() {
-	var ga = document.createElement('script'); ga.type = 'text/javascript'; ga.async = true;
-	ga.src = ('https:' == document.location.protocol ? 'https://ssl' : 'http://www') + '.google-analytics.com/ga.js';
-	var s = document.getElementsByTagName('script')[0]; s.parentNode.insertBefore(ga, s);
-})();
-</script>
-
-	</head>
-	<body style='margin:0px; overflow:hidden'>
-		<div id='panel' style='overflow:scroll; min-width:350px; width:25%; height:100%; z-index:1; position:absolute; background-color:rgba(0,0,0,.5)'>
-			Iteration d/dLambda: <input id='deltaLambda'/><br>
-			<select id='objectTypes'></select><br>
-			Object Distance (m): <input id='objectDist'/><br>
-			<div id="Black_Hole_params">
-				Black Hole Mass (kg): <input id='blackHoleMass'/><br>
-			</div>
-			<div id="Alcubierre_Warp_Drive_Bubble_params">
-				Warp Bubble Thickness: <input id='warpBubbleThickness'/><br>
-				Warp Bubble Velocity (c): <input id='warpBubbleVelocity'/><br>
-				Warp Bubble Radius: <input id='warpBubbleRadius'/><br>
-			</div>
-			<input type='radio' group='1' onclick='location.href="testcube.html"'>Original Background</input><br>
-			<input type='radio' group='1' onclick='location.href="index.html"'>Software update</input><br>
-			<input type='radio' group='1' checked>FBO update</input><br>
-			<button id='reset'>Reset</button><br>
-			<!-- button id='pause'>Pause</button><br -->
-			<!-- Update: <progress id='update-progress' max='100' value='0'></progress><br> -->
-			
-			<br>
-			<h3>Light and Geodesics</h3>
-			Light travels in a straight line.  Turns out the spacetime that light travels through is curved.
-			So how does one find the path that light travels through spacetime?  Enter geodesics.
-			Geodesics calculate the path that a straight line takes over an arbitrarily curved surface.<br>
-			<br>
-			The general equation is described as:
-			\( {\dot x}^\mu = {\Gamma^\mu}_{\alpha \beta} {\ddot x}^\alpha {\ddot x}^\beta \)
-			where \(x^\mu\) is our light particle coordinates in spacetime, and \( {\Gamma^\mu}_{\alpha \beta} \) is our Christoffel Symbol of the Second Kind.
-			This gives us a relation between the acceleration and the velocity of our test particle travelling across the geodesic.
-			It turns out the coefficients of the relation stored in \( \Gamma^\mu_{\alpha \beta} \) tend to be based on the particle position as well.
-			In the end we get a formula for computing the acceleration based on the position and velocity of the particle.<br>
-			<br>
-			<h3>Schwarzschild Geodesic</h3>
-			The Schwarzschild metric describes the curvature of spacetime around a spherically separate object.
-			The metric is given as \( {ds}^2 = -(1 - {2 M \over r}) {dt}^2 + (1 - {2 M \over r})^{-1} ({dx}^2 + {dy}^2 + {dz}^2) \)
-			for M the mass of the object.<br>
-			<h3>Alcubierre Warp Bubble Geodesic</h3>
-			The Alcubierre warp bubble metric describes the curvature of spacetime around a warp bubble.
-			The metric is given as \( {ds}^2 = ({v_s}^2 f(r_s(t))^2 - 1) {dt}^2 - 2 v_s f(r_s) {dx} {dt} + {dx}^2 + {dy}^2 + {dz}^2 \)
-			for \( f(r_s) = (tanh(\sigma(r_s + R)) - tanh(\sigma(r_s - R))) / (2 tanh(\sigma R)) \),
-			\(r_s = \sqrt{(x - x_s)^2 + y^2 + z^2} \),
-			\(x_s\) the warp bubble distance,
-			\(v_s\) the warp bubble velocity,
-			R the warp bubble radius,
-			and \( \sigma \) the warp bubble thickness.<br>
-		</div>
-		<div id='webglfail' style='display:none'>
-			Sorry, your browser does not support WebGL<br>
-			Try one of these other, better browsers:<br>
-			<a href='http://www.google.com/chrome'>Chrome</a><br>
-			<a href='http://www.mozilla.org/firefox'>Firefox</a><br>
-			<a href='http://www.apple.com/safari'>Safari</a><br>
-			<b>Opera Users:</b><br>
-			Enter "opera:config" in the address bar.<br>
-			In the "User Prefs" section set both "Enable Hardware Acceleration" and "Enable WebGL" to "1" and then click "Save".<br>
-			It is still buggy.<br>
-			<b>IE Users:</b><br>
-			Sorry guys, IE doesn't plan to support WebGL.<br>
-			Consider using a more <a href='http://www.w3schools.com/browsers/browsers_stats.asp'>standard compliant</a> browser.<br>
-		</div>
+		<script type='text/javascript'>
+location.href = 'index.html?renderer=GeodesicFBORenderer';
+		</script>
+	</html>
+	<body>
+		Redirecting to <a href='index.html?renderer=GeodesicFBORenderer'>index.html?renderer=GeodesicFBORenderer</a>...
 	</body>
 </html>
