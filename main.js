@@ -59,6 +59,28 @@ var angleForSide = [
 	[0, -1, 0, 0]
 ];
 
+
+
+
+//names of all renderers
+var rendererClassNames = ['GeodesicSWRenderer', 'GeodesicFBORenderer'];
+
+var renderer;
+var rendererClassName;
+(function(){
+	rendererClassName = 'GeodesicSWRenderer';
+	var classname = $.url().param('renderer');
+	if (classname) {
+		rendererClassName = classname;
+	}
+	if (rendererClassNames.indexOf(rendererClassName) == -1) throw "unable to find renderer named "+rendererClassName;
+	renderer = new (window[rendererClassName])();
+})();
+
+//I would like to eventually instanciate all renderers and allow them to be toggled at runtime
+//however courtesy of the scenegraph's globals (which I am not too happy about my current design), this will take a bit more work
+//so in the mean time, this will take a page reset every time the renderer changes
+
 function resize() {
 	canvas.width = window.innerWidth;
 	canvas.height = window.innerHeight;
@@ -71,18 +93,6 @@ function update() {
 	renderer.update();
 	requestAnimFrame(update);
 };
-
-
-var rendererClassName = 'GeodesicSWRenderer';
-(function(){
-	var classname = $.url().param('renderer');
-	if (classname) {
-		rendererClassName = classname;
-	}
-})();
-var renderer = new (window[rendererClassName])();
-
-//merging main.fbo.js and main.js
 
 var mouse;
 function main3(skyTex) {
@@ -214,7 +224,15 @@ function main1() {
 			$(id).blur();
 		});
 	});
-	
+
+	$.each(rendererClassNames, function(i,name) {
+		var radio = $('#' + name);
+		radio.click(function() {
+			location.href = 'index.html?renderer=' + name;
+		});
+		if (name == rendererClassName) radio.attr('checked', 'checked');
+	});
+
 	try {
 		gl = GL.init(canvas);
 	} catch (e) {

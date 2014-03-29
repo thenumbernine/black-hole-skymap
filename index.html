@@ -47,8 +47,8 @@ _gaq.push(['_trackPageview']);
 				Warp Bubble Radius: <input id='warpBubbleRadius'/><br>
 			</div>
 			<input type='radio' group='1' onclick='location.href="testcube.html"'>Original Background</input><br>
-			<input type='radio' group='1' onclick='location.href="index.html"' checked>Software update</input><br>
-			<input type='radio' group='1' onclick='location.href="index.html?renderer=GeodesicFBORenderer"'>FBO update</input><br>
+			<input type='radio' group='1' id='GeodesicSWRenderer'>Software update</input><br>
+			<input type='radio' group='1' id='GeodesicFBORenderer'>FBO update</input><br>
 			<button id='reset'>Reset</button><br>
 			<!-- button id='pause'>Pause</button><br -->
 			<!-- Update: <progress id='update-progress' max='100' value='0'></progress><br> -->
@@ -63,7 +63,7 @@ _gaq.push(['_trackPageview']);
 			\( {\dot x}^\mu = {\Gamma^\mu}_{\alpha \beta} {\ddot x}^\alpha {\ddot x}^\beta \)
 			where \(x^\mu\) is our light particle coordinates in spacetime, and \( {\Gamma^\mu}_{\alpha \beta} \) is our Christoffel Symbol of the Second Kind.
 			This gives us a relation between the acceleration and the velocity of our test particle travelling across the geodesic.
-			It turns out the coefficients of the relation stored in \( \Gamma^\mu_{\alpha \beta} \) tend to be based on the particle position as well.
+			It turns out the coefficients of the relation stored in \( {\Gamma^\mu}_{\alpha \beta} \) tend to be based on the particle position as well.
 			In the end we get a formula for computing the acceleration based on the position and velocity of the particle.<br>
 			<br>
 			<h3>Schwarzschild Geodesic</h3>
