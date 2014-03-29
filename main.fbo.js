@@ -1,7 +1,3 @@
-var canvas;
-var gl;
-var mouse;
-var cubeSides;
 var objectTypes = ['Black Hole', 'Alcubierre Warp Drive Bubble'];
 var objectType = objectTypes[0];
 var objectDist = 10;
@@ -10,22 +6,23 @@ var warpBubbleThickness = 1;
 var warpBubbleVelocity = .5;
 var warpBubbleRadius = 2;
 var deltaLambda = .1;	//ray forward iteration
-//1024x1024 is just too big for my current card to handle
-var lightTexWidth = 512;
-var lightTexHeight = 512;
 
 var ident4 = mat4.create();
 
-/*
-flags: flags used to find what shader to associate with this
-	they are combined with each object type and put in 'shaders'
-	from that, shaders[objectType] determines the shader to run
-*/
-var shaderTypes = ['reset', 'iterate'];
-var lightPosVelChannels = [
-	{flags:['pos']},
-	{flags:['vel']}
-];
+function tanh(x) {
+	var exp2x = Math.exp(2 * x);
+	return (exp2x - 1) / (exp2x + 1);
+}
+
+function sech(x) {
+	var expx = Math.exp(x);
+	return 2. * expx / (expx * expx + 1.);
+}
+
+function sechSq(x) {
+	var y = sech(x);
+	return y * y;
+}
 
 var shaderCommonCode = mlstr(function(){/*
 float tanh(float x) {
@@ -44,7 +41,6 @@ float sechSq(float x) {
 }
 */});
 
-
 function stupidPrint(s) {
 	return;
 	$.each(s.split('\n'), function(_,l) {
@@ -52,10 +48,44 @@ function stupidPrint(s) {
 	});
 }
 
-var shaderScriptParts = [
-	{
-		flags : 'Black_Hole:Alcubierre_Warp_Drive_Bubble:reset:pos:vel:vsh',
-		code : mlstr(function(){/*
+var SQRT_1_2 = Math.sqrt(.5);
+//forward-transforming (object rotations)
+var angleForSide = [
+	[0, -SQRT_1_2, 0, -SQRT_1_2],
+	[0, SQRT_1_2, 0, -SQRT_1_2],
+	[SQRT_1_2, 0, 0, -SQRT_1_2],
+	[SQRT_1_2, 0, 0, SQRT_1_2],
+	[0, 0, 0, -1],
+	[0, -1, 0, 0]
+];
+
+function resize() {
+	canvas.width = window.innerWidth;
+	canvas.height = window.innerHeight;
+	GL.resize();
+}
+
+// render loop
+
+function update() {
+	renderer.update();
+	requestAnimFrame(update);
+};
+
+
+var GeodesicFBORenderer = makeClass({
+	//1024x1024 is just too big for my current card to handle
+	lightTexWidth : 512,
+	lightTexHeight : 512,
+	lightPosVelChannels : [
+		{flags:['pos']},
+		{flags:['vel']}
+	],
+	
+	shaderScriptParts : [
+		{
+			flags : 'Black_Hole:Alcubierre_Warp_Drive_Bubble:reset:pos:vel:vsh',
+			code : mlstr(function(){/*
 attribute vec2 vertex;
 varying vec3 vtxv;
 uniform mat3 rotation;
@@ -64,10 +94,10 @@ void main() {
 	gl_Position = vec4(vertex * 2. - 1., 0., 1.);
 }
 */})
-	},
-	{
-		flags : 'Black_Hole:reset:pos:fsh',
-		code : mlstr(function(){/*
+		},
+		{
+			flags : 'Black_Hole:reset:pos:fsh',
+			code : mlstr(function(){/*
 varying vec3 vtxv;
 uniform float objectDist;
 void main() {
@@ -75,44 +105,44 @@ void main() {
 	gl_FragColor.x -= objectDist;
 }
 */})
-	},
-	{
-		flags : 'Alcubierre_Warp_Drive_Bubble:reset:pos:fsh',
-		code : mlstr(function(){/*
+		},
+		{
+			flags : 'Alcubierre_Warp_Drive_Bubble:reset:pos:fsh',
+			code : mlstr(function(){/*
 varying vec3 vtxv;
 void main() {
 	gl_FragColor = vec4(0.);
 }
 */})
-	},
-	{
-		flags : 'Black_Hole:reset:vel:fsh',
-		code : mlstr(function(){/*
+		},
+		{
+			flags : 'Black_Hole:reset:vel:fsh',
+			code : mlstr(function(){/*
 uniform float objectDist;
 uniform float blackHoleMass;
 */})
-	},
-	{
-		flags : 'Alcubierre_Warp_Drive_Bubble:reset:vel:fsh',
-		code : mlstr(function(){/*
+		},
+		{
+			flags : 'Alcubierre_Warp_Drive_Bubble:reset:vel:fsh',
+			code : mlstr(function(){/*
 uniform float objectDist;
 uniform float warpBubbleThickness;
 uniform float warpBubbleVelocity;
 uniform float warpBubbleRadius;
 */})
-	},
-	{
-		flags : 'Black_Hole:Alcubierre_Warp_Drive_Bubble:reset:vel:fsh',
-		code : mlstr(function(){/*
+		},
+		{
+			flags : 'Black_Hole:Alcubierre_Warp_Drive_Bubble:reset:vel:fsh',
+			code : mlstr(function(){/*
 varying vec3 vtxv;
 void main() {
 	vec3 vel = normalize(vtxv);
 	gl_FragColor.xyz = vel;
 */})
-	},
-	{
-		flags : 'Black_Hole:reset:vel:fsh',
-		code : mlstr(function(){/*
+		},
+		{
+			flags : 'Black_Hole:reset:vel:fsh',
+			code : mlstr(function(){/*
 //when initializing our metric:
 //g_ab v^a v^b = 0 for our metric g
 // (-1 + 2M/r) vt^2 + (vx^2 + vy^2 + vz^2) / (1 - 2M/r) = 0
@@ -125,10 +155,10 @@ void main() {
 	gl_FragColor.w = 1. / oneMinus2MOverR;
 }
 */})
-	},
-	{
-		flags : 'Alcubierre_Warp_Drive_Bubble:reset:vel:fsh',
-		code : mlstr(function(){/*
+		},
+		{
+			flags : 'Alcubierre_Warp_Drive_Bubble:reset:vel:fsh',
+			code : mlstr(function(){/*
 	vec3 pos = vec3(0.);
 	float rs = length(pos - vec3(objectDist, 0., 0.));
 	float sigmaFront = warpBubbleThickness * (rs + warpBubbleRadius);
@@ -146,10 +176,10 @@ void main() {
 		)) / (-1. + vf2);
 }
 */})
-	},
-	{
-		flags : 'Black_Hole:Alcubierre_Warp_Drive_Bubble:iterate:pos:vel:vsh',
-		code : mlstr(function(){/*
+		},
+		{
+			flags : 'Black_Hole:Alcubierre_Warp_Drive_Bubble:iterate:pos:vel:vsh',
+			code : mlstr(function(){/*
 attribute vec2 vertex;
 varying vec2 uv;
 varying vec3 vtxv;
@@ -160,10 +190,10 @@ void main() {
 	gl_Position = vec4(vertex * 2. - 1., 0., 1.);
 }
 */})
-	},
-	{
-		flags : 'Black_Hole:Alcubierre_Warp_Drive_Bubble:iterate:pos:vel:fsh',
-		code : mlstr(function(){/*
+		},
+		{
+			flags : 'Black_Hole:Alcubierre_Warp_Drive_Bubble:iterate:pos:vel:fsh',
+			code : mlstr(function(){/*
 varying vec2 uv;
 varying vec3 vtxv;
 uniform float deltaLambda;
@@ -171,40 +201,40 @@ uniform float objectDist;
 uniform sampler2D lightPosTex;
 uniform sampler2D lightVelTex;
 */})
-	},
-	{
-		flags : 'Black_Hole:iterate:vel:fsh',
-		code : mlstr(function(){/*
+		},
+		{
+			flags : 'Black_Hole:iterate:vel:fsh',
+			code : mlstr(function(){/*
 uniform float blackHoleMass;
 */})
-	},
-	{
-		flags : 'Alcubierre_Warp_Drive_Bubble:iterate:vel:fsh',
-		code : mlstr(function(){/*
+		},
+		{
+			flags : 'Alcubierre_Warp_Drive_Bubble:iterate:vel:fsh',
+			code : mlstr(function(){/*
 uniform float warpBubbleThickness;
 uniform float warpBubbleRadius;
 uniform float warpBubbleVelocity;
 */})
-	},
-	{
-		flags : 'Black_Hole:Alcubierre_Warp_Drive_Bubble:iterate:pos:vel:fsh',
-		code : mlstr(function(){/*
+		},
+		{
+			flags : 'Black_Hole:Alcubierre_Warp_Drive_Bubble:iterate:pos:vel:fsh',
+			code : mlstr(function(){/*
 void main() {
 	vec4 pos = texture2D(lightPosTex, uv);
 	vec4 vel = texture2D(lightVelTex, uv);
 
 */})
-	},
-	{
-		flags : 'Black_Hole:Alcubierre_Warp_Drive_Bubble:iterate:pos:fsh',
-		code : mlstr(function(){/*
+		},
+		{
+			flags : 'Black_Hole:Alcubierre_Warp_Drive_Bubble:iterate:pos:fsh',
+			code : mlstr(function(){/*
 	gl_FragColor = pos + deltaLambda * vel;
 }
 */})
-	},
-	{
-		flags : 'Black_Hole:iterate:vel:fsh',
-		code : mlstr(function(){/*
+		},
+		{
+			flags : 'Black_Hole:iterate:vel:fsh',
+			code : mlstr(function(){/*
 	float r = length(pos.xyz);
 	float oneMinus2MOverR = 1. - 2.*blackHoleMass/r;			
 	float posDotVel = dot(pos.xyz, vel.xyz);
@@ -219,10 +249,10 @@ void main() {
 	gl_FragColor.w = vel.w + deltaLambda * 2. * MOverR2 * invR2M * posDotVel * vel.w;
 }
 */})
-	},
-	{
-		flags : 'Alcubierre_Warp_Drive_Bubble:iterate:vel:fsh',
-		code : mlstr(function(){/*
+		},
+		{
+			flags : 'Alcubierre_Warp_Drive_Bubble:iterate:vel:fsh',
+			code : mlstr(function(){/*
 	float rs = sqrt(dot(pos,pos) + objectDist * (-2. * pos.x + objectDist) );
 	//float rs = length(pos.xyz - vec3(objectDist, 0., 0.));
 	float sigmaFront = warpBubbleThickness * (rs + warpBubbleRadius);
@@ -259,186 +289,383 @@ void main() {
 	);
 }
 */})
-	}
-];
+		}
+	],
 
-function getScriptForFlags(flags) {
-	flags = flags.clone();
-	for (var i = 0; i < flags.length; ++i) {
-		flags[i] = flags[i].replace(new RegExp(' ', 'g'), '_');
-	}
-	var code = '';
-	$.each(shaderScriptParts, function(index, shaderScriptPart) {
-		var parts = shaderScriptPart.flags.split(':');
-		//if all flags are found in parts then use this shader
-		//multiple concatenations? maybe later
-		var failed = false;
-		$.each(flags, function(_,flag) {
-			if (parts.indexOf(flag) == -1) {
-				failed = true;
-				return false;	//break;
+	getScriptForFlags : function(flags) {
+		flags = flags.clone();
+		for (var i = 0; i < flags.length; ++i) {
+			flags[i] = flags[i].replace(new RegExp(' ', 'g'), '_');
+		}
+		var code = '';
+		$.each(this.shaderScriptParts, function(index, shaderScriptPart) {
+			var parts = shaderScriptPart.flags.split(':');
+			//if all flags are found in parts then use this shader
+			//multiple concatenations? maybe later
+			var failed = false;
+			$.each(flags, function(_,flag) {
+				if (parts.indexOf(flag) == -1) {
+					failed = true;
+					return false;	//break;
+				}
+			});
+			if (failed) {
+				return;	//continue;
+			}
+			var text = shaderScriptPart.code;
+			stupidPrint('adding '+text);
+			code += text; 
+		});
+		if (code == '') throw "couldn't find code for flags "+flags.join(':');
+		stupidPrint('building '+flags.join(':')+' and getting '+code);
+		return code;
+	},
+
+	getShaderProgramArgsForFlags : function(flags) {
+		var vshFlags = flags.clone();
+		vshFlags.push('vsh');
+		var vertexCode = this.getScriptForFlags(vshFlags);
+		
+		var fshFlags = flags.clone();
+		fshFlags.push('fsh');
+		var fragmentCode = this.getScriptForFlags(fshFlags);
+
+		fragmentCode = shaderCommonCode + fragmentCode;
+
+		return {
+			vertexCode : vertexCode,
+			fragmentCode : fragmentCode
+		};
+	},
+
+	testInit : function() {
+		if (!gl.getExtension('OES_texture_float')) {
+			throw 'This requires OES_texture_float';
+		}
+	},
+	initScene : function(skyTex) {
+		var thiz = this;
+		$.each(thiz.lightPosVelChannels, function(_,channel) {
+			//working on how to organize this
+			channel.uniforms = [
+				'blackHoleMass', 
+				'warpBubbleThickness', 
+				'warpBubbleRadius', 
+				'warpBubbleVelocity', 
+				'objectDist', 
+				'deltaLambda'
+			];
+			
+			channel.texs = [];
+			channel.fbos = [];
+			for (var history = 0; history < 2; ++history) {
+				var texs = [];
+				channel.texs[history] = texs;
+				var fbos = [];
+				channel.fbos[history] = fbos;
+				for (var side = 0; side < 6; ++side) {
+					var tex = new GL.Texture2D({
+						internalFormat : gl.RGBA,
+						format : gl.RGBA,
+						type : gl.FLOAT,
+						width : thiz.lightTexWidth,
+						height : thiz.lightTexHeight,
+						magFilter : gl.NEAREST,
+						minFilter : gl.NEAREST,
+						wrap : {
+							s : gl.CLAMP_TO_EDGE,
+							t : gl.CLAMP_TO_EDGE
+						}
+					});
+					texs[side] = tex;
+					
+					var fbo = new GL.Framebuffer();
+					gl.bindFramebuffer(gl.FRAMEBUFFER, fbo.obj);
+					gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, tex.obj, 0);
+					gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+					fbos[side] = fbo;
+				}
+			}
+			
+			channel.shaders = {};
+					
+			$.each(objectTypes, function(_,objType) {
+				var flags = channel.flags.clone();
+				flags.push(objType);
+				channel.shaders[objType] = {};
+				
+				/*
+				flags: flags used to find what shader to associate with this
+					they are combined with each object type and put in 'shaders'
+					from that, shaders[objectType] determines the shader to run
+				*/
+				var shaderTypes = ['reset', 'iterate'];
+				
+				$.each(shaderTypes, function(_,shaderType) {
+					var shflags = flags.clone();
+					shflags.push(shaderType);
+					var args = thiz.getShaderProgramArgsForFlags(shflags);
+					args.uniforms = {
+						lightPosTex : 0,
+						lightVelTex : 1
+					};
+					args.vertexPrecision = 'best';
+					args.fragmentPrecision = 'best';
+					channel.shaders[objType][shaderType] = new GL.ShaderProgram(args);
+				});
+			});
+		});
+
+		var cubeShader = new GL.ShaderProgram({
+			vertexPrecision : 'best',
+			vertexCode : mlstr(function(){/*
+attribute vec2 vertex;
+varying vec2 uv;
+uniform mat4 projMat;
+uniform vec4 angle;
+const mat3 viewMatrix = mat3(
+	0., 0., -1.,
+	1., 0., 0., 
+	0., -1., 0.);
+vec3 qtransform( vec4 q, vec3 v ){ 
+	return v + 2.0*cross(cross(v, q.xyz ) + q.w*v, q.xyz);
+}
+void main() {
+	uv = vertex;
+	vec3 vtx3 = vec3(vertex * 2. - 1., 1.);
+	vtx3 = qtransform(angle, vtx3);
+	vtx3 = viewMatrix * vtx3;
+	vec4 vtx4 = vec4(vtx3, 1.);
+	gl_Position = projMat * vtx4;
+}
+*/}),
+			fragmentPrecision : 'best',
+			fragmentCode : shaderCommonCode + mlstr(function(){/*
+varying vec2 uv;
+uniform samplerCube skyTex;
+uniform sampler2D lightVelTex;
+uniform vec4 viewAngle;
+const mat3 viewMatrixInv = mat3(
+	0., 1., 0.,
+	0., 0., -1.,
+	-1., 0., 0.);
+vec3 qtransform( vec4 q, vec3 v ){ 
+	return v + 2.0*cross(cross(v, q.xyz) + q.w*v, q.xyz);
+}
+void main() {
+	vec3 dir = texture2D(lightVelTex, uv).xyz;
+	dir = viewMatrixInv * viewMatrixInv * dir;
+	dir = qtransform(vec4(viewAngle.xyz, -viewAngle.w), dir);
+	gl_FragColor.xyz = textureCube(skyTex, dir).xyz;
+	gl_FragColor.w = 1.; 
+}*/}),
+			uniforms : {
+				skyTex : 0,
+				lightVelTex : 1
 			}
 		});
-		if (failed) {
-			return;	//continue;
-		}
-		var text = shaderScriptPart.code;
-		stupidPrint('adding '+text);
-		code += text; 
-	});
-	if (code == '') throw "couldn't find code for flags "+flags.join(':');
-	stupidPrint('building '+flags.join(':')+' and getting '+code);
-	return code;
-}
 
-function getShaderProgramArgsForFlags(flags) {
-	var vshFlags = flags.clone();
-	vshFlags.push('vsh');
-	var vertexCode = getScriptForFlags(vshFlags);
-	
-	var fshFlags = flags.clone();
-	fshFlags.push('fsh');
-	var fragmentCode = getScriptForFlags(fshFlags);
-
-	fragmentCode = shaderCommonCode + fragmentCode;
-
-	return {
-		vertexCode : vertexCode,
-		fragmentCode : fragmentCode
-	};
-}
-
-var SQRT_1_2 = Math.sqrt(.5);
-var angleForSide = [
-	[0, -SQRT_1_2, 0, -SQRT_1_2],
-	[0, SQRT_1_2, 0, -SQRT_1_2],
-	[SQRT_1_2, 0, 0, -SQRT_1_2],
-	[SQRT_1_2, 0, 0, SQRT_1_2],
-	[0, 0, 0, -1],
-	[0, -1, 0, 0]
-];
-
-function resize() {
-	canvas.width = window.innerWidth;
-	canvas.height = window.innerHeight;
-	GL.resize();
-}
-
-
-var rotationMat3 = mat3.create();
-function resetField() {
-	gl.viewport(0, 0, lightTexWidth, lightTexHeight);
-	$.each(lightPosVelChannels, function(_,channel) {
+		//scene graph, 6 quads oriented in a cube
+		//I would use a cubemap but the Mali-400 doesn't seem to want to use them as 2D FBO targets ...
+		this.cubeSides = [];
 		for (var side = 0; side < 6; ++side) {
-			var shader = channel.shaders[objectType].reset;
-			
-			var uniforms = {};
-			if (channel.uniforms !== undefined) {
-				for (var i = 0; i < channel.uniforms.length; ++i) {
-					var uniformName = channel.uniforms[i];
-					uniforms[uniformName] = window[uniformName];
-				}
-			}
-			mat3.fromQuat(rotationMat3, angleForSide[side]);
-			uniforms.rotation = rotationMat3;
-			
-			var fbo = channel.fbos[0][side];
-			fbo.draw({
-				callback:function(){
-					GL.unitQuad.draw({
-						shader:shader,
-						uniforms:uniforms
-					});
-				}
+			this.cubeSides[side] = new GL.SceneObject({
+				//geometry : GL.unitQuad.geometry,
+				mode : gl.TRIANGLE_STRIP,
+				attrs : {
+					vertex : GL.unitQuadVertexBuffer
+				},
+				uniforms : {
+					viewAngle : GL.view.angle,
+					angle : angleForSide[side]
+				},
+				shader : cubeShader,
+				texs : [skyTex, this.lightPosVelChannels[1].texs[0][side]],
 			});
 		}
-	});
-	gl.viewport(0, 0, GL.canvas.width, GL.canvas.height);
-}
 
 
-//update the uint8 array from the float array
-//then upload the uint8 array to the gpu
-function updateLightPosTex() {	
-	gl.viewport(0, 0, lightTexWidth, lightTexHeight);
-	$.each(lightPosVelChannels, function(_,channel) {
-		for (var side = 0; side < 6; ++side) {
-			var shader = channel.shaders[objectType].iterate;
-			
-			var uniforms = {};
-			if (channel.uniforms !== undefined) {
-				for (var i = 0; i < channel.uniforms.length; ++i) {
-					var uniformName = channel.uniforms[i];
-					uniforms[uniformName] = window[uniformName];
+	},
+
+	resetField : function() {
+		gl.viewport(0, 0, this.lightTexWidth, this.lightTexHeight);
+		$.each(this.lightPosVelChannels, function(_,channel) {
+			for (var side = 0; side < 6; ++side) {
+				var shader = channel.shaders[objectType].reset;
+				
+				var uniforms = {};
+				if (channel.uniforms !== undefined) {
+					for (var i = 0; i < channel.uniforms.length; ++i) {
+						var uniformName = channel.uniforms[i];
+						uniforms[uniformName] = window[uniformName];
+					}
 				}
+				var rotationMat3 = mat3.create();
+				mat3.fromQuat(rotationMat3, angleForSide[side]);
+				uniforms.rotation = rotationMat3;
+				
+				var fbo = channel.fbos[0][side];
+				fbo.draw({
+					callback:function(){
+						GL.unitQuad.draw({
+							shader:shader,
+							uniforms:uniforms
+						});
+					}
+				});
 			}
-			mat3.fromQuat(rotationMat3, angleForSide[side]);
-			uniforms.rotation = rotationMat3;
-			uniforms.lightPosTex = 0;
-			uniforms.lightVelTex = 1;
-			
-			var fbo = channel.fbos[1][side];
-			fbo.draw({
-				callback:function(){
-					GL.unitQuad.draw({
-						shader:shader,
-						uniforms:uniforms,
-						texs:[
-							lightPosVelChannels[0].texs[0][side],
-							lightPosVelChannels[1].texs[0][side]
-						]
-					});
+		});
+		gl.viewport(0, 0, GL.canvas.width, GL.canvas.height);
+	},
+	
+	updateLightPosTex : function() {	
+		var thiz = this;
+		gl.viewport(0, 0, this.lightTexWidth, this.lightTexHeight);
+		$.each(this.lightPosVelChannels, function(_,channel) {
+			for (var side = 0; side < 6; ++side) {
+				var shader = channel.shaders[objectType].iterate;
+				
+				var uniforms = {};
+				if (channel.uniforms !== undefined) {
+					for (var i = 0; i < channel.uniforms.length; ++i) {
+						var uniformName = channel.uniforms[i];
+						uniforms[uniformName] = window[uniformName];
+					}
 				}
-			});
+				var rotationMat3 = mat3.create();
+				mat3.fromQuat(rotationMat3, angleForSide[side]);
+				uniforms.rotation = rotationMat3;
+				uniforms.lightPosTex = 0;
+				uniforms.lightVelTex = 1;
+				
+				var fbo = channel.fbos[1][side];
+				fbo.draw({
+					callback:function(){
+						GL.unitQuad.draw({
+							shader:shader,
+							uniforms:uniforms,
+							texs:[
+								thiz.lightPosVelChannels[0].texs[0][side],
+								thiz.lightPosVelChannels[1].texs[0][side]
+							]
+						});
+					}
+				});
+			}
+		});
+		gl.viewport(0, 0, GL.canvas.width, GL.canvas.height);
+		$.each(this.lightPosVelChannels, function(_,channel) {
+			var tmp;
+			tmp = channel.texs[0];
+			channel.texs[0] = channel.texs[1];
+			channel.texs[1] = tmp;
+			tmp = channel.fbos[0];
+			channel.fbos[0] = channel.fbos[1];
+			channel.fbos[1] = tmp;
+		});
+	},
+
+	update : function() {
+		this.updateLightPosTex();
+		
+		//turn on magnification filter
+		for (var side = 0; side < 6; ++side) {
+			var tex = this.lightPosVelChannels[1].texs[0][side].obj;
+			gl.bindTexture(gl.TEXTURE_2D, tex);
+			gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+			//gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR);
+			//gl.generateMipmap(gl.TEXTURE_2D);
+			gl.bindTexture(gl.TEXTURE_2D, null);
+		}
+		
+		for (var side = 0; side < 6; ++side) {
+			//texs[0] is skyTex
+			this.cubeSides[side].texs[1] = this.lightPosVelChannels[1].texs[0][side];
+		}
+
+		GL.draw();	
+		
+		//turn off magnification filter
+		for (var side = 0; side < 6; ++side) {
+			var tex = this.lightPosVelChannels[1].texs[0][side].obj;
+			gl.bindTexture(gl.TEXTURE_2D, tex);
+			gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+			//gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+			gl.bindTexture(gl.TEXTURE_2D, null);
+		}	
+	}
+
+});
+
+var renderer = new GeodesicFBORenderer();
+
+//merging main.fbo.js and main.js
+
+var mouse;
+function main3(skyTex) {
+	renderer.initScene(skyTex);
+
+	var tmpQ = quat.create();	
+	mouse = new Mouse3D({
+		pressObj : canvas,
+		move : function(dx,dy) {
+			var rotAngle = Math.PI / 180 * .01 * Math.sqrt(dx*dx + dy*dy);
+			quat.setAxisAngle(tmpQ, [dy, dx, 0], rotAngle);
+
+			quat.mul(GL.view.angle, GL.view.angle, tmpQ);
+			quat.normalize(GL.view.angle, GL.view.angle);
+		},
+		zoom : function(dz) {
+			GL.view.fovY *= Math.exp(-.0003 * dz);
+			GL.view.fovY = Math.clamp(GL.view.fovY, 1, 179);
+			GL.updateProjection();
 		}
 	});
-	gl.viewport(0, 0, GL.canvas.width, GL.canvas.height);
-	$.each(lightPosVelChannels, function(_,channel) {
-		var tmp;
-		tmp = channel.texs[0];
-		channel.texs[0] = channel.texs[1];
-		channel.texs[1] = tmp;
-		tmp = channel.fbos[0];
-		channel.fbos[0] = channel.fbos[1];
-		channel.fbos[1] = tmp;
+
+	renderer.resetField();
+
+	$(window).resize(resize);
+	resize();
+	update();
+}
+
+
+var main2Initialized = false;
+function main2() {
+	if (main2Initialized) {
+		console.log("main2 got called twice again.  check the preloader.");
+		return;
+	}
+	main2Initialized = true; 
+	
+	GL.view.zNear = .1;
+	GL.view.zFar = 100;
+	GL.view.fovY = 90;
+	quat.mul(GL.view.angle, /*90' x*/[SQRT_1_2,0,0,SQRT_1_2], /*90' -y*/[0,-SQRT_1_2,0,SQRT_1_2]);
+
+	console.log('creating skyTex');
+	var skyTex = new GL.TextureCube({
+		flipY : true,
+		generateMipmap : true,
+		magFilter : gl.LINEAR,
+		minFilter : gl.LINEAR_MIPMAP_LINEAR,
+		wrap : {
+			s : gl.CLAMP_TO_EDGE,
+			t : gl.CLAMP_TO_EDGE
+		},
+		urls : skyTexFilenames,
+		onload : function(side,url,image) {
+			if (image.width > glMaxCubeMapTextureSize || image.height > glMaxCubeMapTextureSize) {
+				throw "cube map size "+image.width+"x"+image.height+" cannot exceed "+glMaxCubeMapTextureSize;
+			}
+		},
+		done : function() {
+			main3(this);
+		}
 	});
 }
 
-// render loop
-function update() {
-	updateLightPosTex();
-	
-	//turn on magnification filter
-	for (var side = 0; side < 6; ++side) {
-		var tex = lightPosVelChannels[1].texs[0][side].obj;
-		gl.bindTexture(gl.TEXTURE_2D, tex);
-		gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
-		//gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR);
-		//gl.generateMipmap(gl.TEXTURE_2D);
-		gl.bindTexture(gl.TEXTURE_2D, null);
-	}
-	
-	for (var side = 0; side < 6; ++side) {
-		//texs[0] is skyTex
-		cubeSides[side].texs[1] = lightPosVelChannels[1].texs[0][side];
-	}
 
-	GL.draw();	
-	
-	//turn off magnification filter
-	for (var side = 0; side < 6; ++side) {
-		var tex = lightPosVelChannels[1].texs[0][side].obj;
-		gl.bindTexture(gl.TEXTURE_2D, tex);
-		gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
-		//gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
-		gl.bindTexture(gl.TEXTURE_2D, null);
-	}	
-
-	requestAnimFrame(update);
-};
-
-$(document).ready(main1);
-	
 var skyTexFilenames = [
 	'skytex/sky-visible-cube-xp.png',
 	'skytex/sky-visible-cube-xn.png',
@@ -447,8 +674,14 @@ var skyTexFilenames = [
 	'skytex/sky-visible-cube-zp.png',
 	'skytex/sky-visible-cube-zn.png'
 ];
+
+var glMaxCubeMapTextureSize;
+
+var panel;
+var canvas;
+var gl;
 function main1() {
-	panel = $('#panel');
+	panel = $('#panel');	
 	canvas = $('<canvas>', {
 		css : {
 			left : 0,
@@ -479,7 +712,7 @@ function main1() {
 	$('#objectTypes').change(function() {
 		objectType = $('#objectTypes').val();
 		refreshObjectTypeParamDivs();
-		resetField();
+		renderer.resetField();
 	});
 	refreshObjectTypeParamDivs();
 
@@ -499,18 +732,6 @@ function main1() {
 		});
 	});
 	
-	$('#reset').click(function() {
-		resetField();
-	});
-
-/* async for doesnt lkke pauses...
-	$('#pause').click(function() {
-		if (updateInterval === undefined) {
-		} else {
-		}
-	});
-*/
-
 	try {
 		gl = GL.init(canvas);
 	} catch (e) {
@@ -520,198 +741,18 @@ function main1() {
 		throw e;
 	}
 	
-	if (!gl.getExtension('OES_texture_float')) {
-		throw 'This requires OES_texture_float';
-	}
+	glMaxCubeMapTextureSize = gl.getParameter(gl.MAX_CUBE_MAP_TEXTURE_SIZE);
+
+	$('#reset').click(function() {
+		renderer.resetField();
+	});
+
+	renderer.testInit();
 
 	gl.disable(gl.DITHER);
 
 	$(skyTexFilenames).preload(main2);
 }
 
-var main2Initialized = false;
-function main2() {
-	if (main2Initialized) {
-		console.log("main2 got called twice again.  check the preloader.");
-		return;
-	}
-	main2Initialized = true; 
-	
-	GL.view.zNear = .1;
-	GL.view.zFar = 100;
-	GL.view.fovY = 90;
-	quat.mul(GL.view.angle, /*90' x*/[SQRT_1_2,0,0,SQRT_1_2], /*90' -y*/[0,-SQRT_1_2,0,SQRT_1_2]);
-
-	console.log('creating skyTex');
-	var skyTex = new GL.TextureCube({
-		flipY : true,
-		generateMipmap : true,
-		magFilter : gl.LINEAR,
-		minFilter : gl.LINEAR_MIPMAP_LINEAR,
-		wrap : {
-			s : gl.CLAMP_TO_EDGE,
-			t : gl.CLAMP_TO_EDGE
-		},
-		urls : skyTexFilenames,
-		done : function() {
-			main3(this);
-		}
-	});
-}
-
-function main3(skyTex) {
-	$.each(lightPosVelChannels, function(_,channel) {
-		//working on how to organize this
-		channel.uniforms = [
-			'blackHoleMass', 
-			'warpBubbleThickness', 
-			'warpBubbleRadius', 
-			'warpBubbleVelocity', 
-			'objectDist', 
-			'deltaLambda'
-		];
-		
-		channel.texs = [];
-		channel.fbos = [];
-		for (var history = 0; history < 2; ++history) {
-			var texs = [];
-			channel.texs[history] = texs;
-			var fbos = [];
-			channel.fbos[history] = fbos;
-			for (var side = 0; side < 6; ++side) {
-				var tex = new GL.Texture2D({
-					internalFormat : gl.RGBA,
-					format : gl.RGBA,
-					type : gl.FLOAT,
-					width : lightTexWidth,
-					height : lightTexHeight,
-					magFilter : gl.NEAREST,
-					minFilter : gl.NEAREST,
-					wrap : {
-						s : gl.CLAMP_TO_EDGE,
-						t : gl.CLAMP_TO_EDGE
-					}
-				});
-				texs[side] = tex;
-				
-				var fbo = new GL.Framebuffer();
-				gl.bindFramebuffer(gl.FRAMEBUFFER, fbo.obj);
-				gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, tex.obj, 0);
-				gl.bindFramebuffer(gl.FRAMEBUFFER, null);
-				fbos[side] = fbo;
-			}
-		}
-		
-		channel.shaders = {};
-		$.each(objectTypes, function(_,objType) {
-			var flags = channel.flags.clone();
-			flags.push(objType);
-			channel.shaders[objType] = {};
-			$.each(shaderTypes, function(_,shaderType) {
-				var shflags = flags.clone();
-				shflags.push(shaderType);
-				var args = getShaderProgramArgsForFlags(shflags);
-				args.uniforms = {
-					lightPosTex : 0,
-					lightVelTex : 1
-				};
-				args.vertexPrecision = 'best';
-				args.fragmentPrecision = 'best';
-				channel.shaders[objType][shaderType] = new GL.ShaderProgram(args);
-			});
-		});
-	});
-
-	var cubeShader = new GL.ShaderProgram({
-		vertexCode : mlstr(function(){/*
-attribute vec2 vertex;
-varying vec2 uv;
-uniform mat4 projMat;
-uniform vec4 angle;
-const mat3 viewMatrix = mat3(
-	0., 0., -1.,
-	1., 0., 0., 
-	0., -1., 0.);
-vec3 qtransform( vec4 q, vec3 v ){ 
-	return v + 2.0*cross(cross(v, q.xyz ) + q.w*v, q.xyz);
-}
-void main() {
-	uv = vertex;
-	vec3 vtx3 = vec3(vertex * 2. - 1., 1.);
-	vtx3 = qtransform(angle, vtx3);
-	vtx3 = viewMatrix * vtx3;
-	vec4 vtx4 = vec4(vtx3, 1.);
-	gl_Position = projMat * vtx4;
-}
-*/}),
-		fragmentCode : shaderCommonCode + mlstr(function(){/*
-varying vec2 uv;
-uniform samplerCube skyTex;
-uniform sampler2D lightVelTex;
-uniform vec4 viewAngle;
-const mat3 viewMatrixInv = mat3(
-	0., 1., 0.,
-	0., 0., -1.,
-	-1., 0., 0.);
-vec3 qtransform( vec4 q, vec3 v ){ 
-	return v + 2.0*cross(cross(v, q.xyz) + q.w*v, q.xyz);
-}
-void main() {
-	vec3 dir = texture2D(lightVelTex, uv).xyz;
-	dir = viewMatrixInv * viewMatrixInv * dir;
-	dir = qtransform(vec4(viewAngle.xyz, -viewAngle.w), dir);
-	gl_FragColor.xyz = textureCube(skyTex, dir).xyz;
-	gl_FragColor.w = 1.; 
-}*/}),
-		uniforms : {
-			skyTex : 0,
-			lightVelTex : 1
-		},
-		vertexPrecision : 'best',
-		fragmentPrecision : 'best'
-	});
-
-	//scene graph, 6 quads oriented in a cube
-	//I would use a cubemap but the Mali-400 doesn't seem to want to use them as 2D FBO targets ...
-	cubeSides = [];
-	for (var side = 0; side < 6; ++side) {
-		cubeSides[side] = new GL.SceneObject({
-			//geometry : GL.unitQuad.geometry,
-			mode : gl.TRIANGLE_STRIP,
-			attrs : {
-				vertex : GL.unitQuadVertexBuffer
-			},
-			uniforms : {
-				viewAngle : GL.view.angle,
-				angle : angleForSide[side]
-			},
-			shader : cubeShader,
-			texs : [skyTex, lightPosVelChannels[1].texs[0][side]],
-		});
-	}
-
-	var tmpQ = quat.create();	
-	mouse = new Mouse3D({
-		pressObj : canvas,
-		move : function(dx,dy) {
-			var rotAngle = Math.PI / 180 * .01 * Math.sqrt(dx*dx + dy*dy);
-			quat.setAxisAngle(tmpQ, [dy, dx, 0], rotAngle);
-
-			quat.mul(GL.view.angle, GL.view.angle, tmpQ);
-			quat.normalize(GL.view.angle, GL.view.angle);
-		},
-		zoom : function(dz) {
-			GL.view.fovY *= Math.exp(-.0003 * dz);
-			GL.view.fovY = Math.clamp(GL.view.fovY, 1, 179);
-			GL.updateProjection();
-		}
-	});
-
-	resetField();
-
-	$(window).resize(resize);
-	resize();
-	update();
-}
-
+$(document).ready(main1);
 

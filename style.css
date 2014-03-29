@@ -1,0 +1,26 @@
+body {
+	background-color:black;
+	color:white;
+}
+
+a:link {
+	cursor:pointer;
+	color:#00FFFF;
+}
+
+a:visited {
+	cursor:pointer;
+	color:#00FFFF;
+}
+
+a:hover {
+	cursor:pointer;
+	color:#00FFFF;
+}
+
+a:active {
+	cursor:pointer;
+	color:#00FFFF;
+}
+	
+
