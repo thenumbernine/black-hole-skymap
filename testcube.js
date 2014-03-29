@@ -5,7 +5,6 @@ simple skybox viewer.  like the volumizer, I should really make this its own uti
 var canvas;
 var gl;
 var mouse;
-var cubeObj;
 
 function resize() {
 	canvas.width = window.innerWidth;
@@ -108,7 +107,7 @@ function main3(skyTex) {
 		cubeVtxArray[2+3*i] = 2*((i>>2)&1)-1;
 	}
 
-	cubeVtxBuf = new GL.ArrayBuffer({
+	var cubeVtxBuf = new GL.ArrayBuffer({
 		data : cubeVtxArray 
 	});
 
@@ -123,7 +122,7 @@ function main3(skyTex) {
 		]
 	});
 
-	cubeObj = new GL.SceneObject({
+	var cubeObj = new GL.SceneObject({
 		mode : gl.TRIANGLES,
 		attrs : {
 			vertex : cubeVtxBuf

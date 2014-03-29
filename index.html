@@ -17,6 +17,7 @@
 		<script type='text/javascript' src='/js/gl-util-kernel.js'></script>
 		<script type='text/javascript' src='/js/mouse3d.js'></script>
 		<script type="text/javascript" src="http://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
+		<script type='text/javascript' src='renderer.testcube.js'></script>
 		<script type='text/javascript' src='renderer.sw.js'></script>
 		<script type='text/javascript' src='renderer.fbo.js'></script>
 		<script type='text/javascript' src='main.js'></script>
@@ -46,7 +47,7 @@ _gaq.push(['_trackPageview']);
 				Warp Bubble Velocity (c): <input id='warpBubbleVelocity'/><br>
 				Warp Bubble Radius: <input id='warpBubbleRadius'/><br>
 			</div>
-			<input type='radio' group='1' onclick='location.href="testcube.html"'>Original Background</input><br>
+			<input type='radio' group='1' id='GeodesicTestCubeRenderer'>Original Background</input><br>
 			<input type='radio' group='1' id='GeodesicSWRenderer'>Software update</input><br>
 			<input type='radio' group='1' id='GeodesicFBORenderer'>FBO update</input><br>
 			<button id='reset'>Reset</button><br>

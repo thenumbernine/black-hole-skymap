@@ -63,7 +63,11 @@ var angleForSide = [
 
 
 //names of all renderers
-var rendererClassNames = ['GeodesicSWRenderer', 'GeodesicFBORenderer'];
+var rendererClassNames = [
+	'GeodesicTestCubeRenderer',
+	'GeodesicSWRenderer',
+	'GeodesicFBORenderer'
+];
 
 var renderer;
 var rendererClassName;
