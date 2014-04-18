@@ -53,61 +53,108 @@ _gaq.push(['_trackPageview']);
 			<button id='reset'>Reset</button><br>
 			<!-- button id='pause'>Pause</button><br -->
 			<!-- Update: <progress id='update-progress' max='100' value='0'></progress><br> -->
-			
-			<br>
-			<h3>Light and Geodesics</h3>
-			Light travels in a straight line.  Let's represent the position of a particle of light as \(x^\mu\), for \(\mu\) running over indexes 0, 1, 2, 3.
-			\(x^0 = t\) will represent the position in time of the particle. \(x^i\), for i running 1 through 3, will represent the coordinate in 3D space of the particle.
-			\(x^1\) will represent the x coordinate, \(x^2 = y\), and \(x^3 = z\).<br>
-			<br>
-			From a stationary observer a light particle appears to travel through time.  Let \(\tau\) represent the observer's position in time.
-			The change in the light particle's position (in space and time) with respect to the change in the observer's time (the velocity in the observer's rest frame) can be represented as \({d \over {d\tau}} x^\mu\), or \({\dot x}^\mu\) for short.
-			This appearance of velocity is only present to the observer, of course.
-			To the particle of light in its own rest frame, it is simultaneously existing in all locations.
-			For more on that check out the page on <a href='/time-dilation'>time dilation</a>.<br>
-			<br>
-			Turns out the spacetime that light travels through is not flat, but curved.
-			Curved geometry is described in terms of its line element, \(ds^s = g_{\mu\nu} dx^\mu dx^\nu \), for \(g_{\mu\nu}\) the metric tensor.<br>
-			<br>
-			So how does one find the coordinates of path that light travels through a curved spacetime?  Enter the world of geodesics.
-			Geodesics calculate the path that a straight line takes over an arbitrarily curved surface.
-			The geodesic equation is described as
-			\( {\ddot x}^\mu + {\Gamma^\mu}_{\alpha \beta} {\dot x}^\alpha {\dot x}^\beta = 0 \)
-			where \( {\Gamma^\mu}_{\alpha \beta} \) is the Christoffel Symbol of the Second Kind.<br>
-			<br>
-			The Christoffel Symbol of the Second Kind can be defined as \( {\Gamma^\mu}_{\alpha \beta} = g^{\mu\nu} \Gamma_{\nu \alpha \beta} \),
-			for \(g^{\mu\nu}\) the inverse of the metric tensor and for \( {\Gamma_{\nu \alpha \beta}} \) the Christoffel Symbol of the First Kind.
-			The Christoffel Symbol of the First Kind is then defined as \( \Gamma_{\alpha \beta \gamma} = {1 \over 2} (g_{\alpha \beta, \gamma} + g_{\alpha \gamma, \beta} - g_{\beta \gamma, \alpha})\)
-			for comma derivative shorthand \(g_{\alpha \beta, \gamma} = {d \over {d {x^\gamma}}} g_{\alpha \beta}\).<br>
-			<br>
-			The geodesic equation gives us a relation between the first and second derivatives of the coordinates our test particle travelling along the geodesic.
-			It turns out the coefficients of the relation stored in \( {\Gamma^\mu}_{\alpha \beta} \) tend to be based on the particle position \(x^\mu\) as well.
-			In the end we get a formula for computing \({\ddot x}^\mu\) based on the \(x^\mu\) and \({\dot x}^\mu\).<br>
-			<br>
-			<h3>Implementation</h3>
-			Once we have these relations we can approximate them by simulating the position and velocity of light particles at arbitrary samples on the screen. 
-			The positions and velocities are updated using your favorite numeric integration method with the following equations:
-\( {d \over {d\tau}} \left[ \matrix { x^\mu \\ {\dot x}^\mu } \right]
-= \left[ \matrix{ {\dot x}^\mu \\ {\ddot x}^\mu } \right]
-= \left[ \matrix{ {\dot x}^\mu \\ -{\Gamma^\mu}_{\alpha \beta} {\dot x}^\alpha {\dot x}^\beta } \right]
-\).
-			<h3>Schwarzschild Geodesic</h3>
-			The Schwarzschild metric describes the curvature of spacetime around a spherical object.
-			The metric is given as \( {ds}^2 = -(1 - {2 M \over r}) {dt}^2 + (1 - {2 M \over r})^{-1} ({dx}^2 + {dy}^2 + {dz}^2) \)
-			for M the mass of the object.<br>
-			<h3>Kerr Geodesic</h3>
-			The Kerr metric describes the curvature of spacetime around a spherical rotating object.
-			The metric is given as \( {ds}^2 = -{dt}^2 + {dx}^2 + {dy}^2 + {dz}^2 + {2mr^3 \over {r^4 + a^2 z^2}} (dt + {{rx+ay}\over{a^2+r^2}} dx + {{ry-ax}\over{a^2+r^2}} dy + {z \over r} dz)^2 \)
-			for the mass \(m\), angular acceleration \(a\), and \(r\) is defined by \( x^2 + y^2 + z^2 = r^2 + a^2 (1 - {z^2 \over r^2}) \).<br>
-			<h3>Alcubierre Warp Bubble Geodesic</h3>
-			The Alcubierre warp bubble metric describes the curvature of spacetime around a warp bubble.
-			The metric is given as \( {ds}^2 = ({v_s}^2 f(r_s(t))^2 - 1) {dt}^2 - 2 v_s f(r_s) {dx} {dt} + {dx}^2 + {dy}^2 + {dz}^2 \)
-			for \( f(r_s) = (tanh(\sigma(r_s + R)) - tanh(\sigma(r_s - R))) / (2 tanh(\sigma R)) \),
-			\(r_s = \sqrt{(x - x_s)^2 + y^2 + z^2} \),
-			\(x_s\) the warp bubble distance,
-			\(v_s\) the warp bubble velocity,
-			R the warp bubble radius,
-			and \( \sigma \) the warp bubble thickness.<br>
+		
+			<div style='padding-left:10px'>
+				<br>
+				<h3>Photons</h3>
+				Light travels in a straight line.  Let's represent the position of a particle of light as \(x^\mu\), for \(\mu\) running over indexes 0, 1, 2, 3.
+				\(x^0 = t\) will represent the position in time of the particle. \(x^i\), for i running 1 through 3, will represent the coordinate in 3D space of the particle.
+				\(x^1\) will represent the x coordinate, \(x^2 = y\), and \(x^3 = z\).<br>
+				<br>
+				From a stationary observer a light particle appears to travel through time.  Let \(\tau\) represent the observer's position in time.
+				The change in the light particle's position (in space and time) with respect to the change in the observer's time (the velocity in the observer's rest frame) can be represented as \({d \over {d\tau}} x^\mu\), or \({\dot x}^\mu\) for short.
+				This appearance of velocity is only present to the observer, of course.
+				To the particle of light in its own rest frame, it is existing in all locations from its origin to its destination simultaneously.
+				For more on that check out the page on <a href='/time-dilation'>time dilation</a>.<br>
+				<br>
+				<h3>The Line Element</h3>
+				Turns out the spacetime that light travels through is not flat, but curved.
+				Curved geometry is described in terms of its line element \(ds^2 = g_{\mu\nu} dx^\mu dx^\nu \).
+				The symbol \(g_{\mu\nu}\) is the metric tensor and describes how the curved surface deforms lines drawn along the surface.
+				This line element description comes from the following:<br>
+				\(ds^2 = g_{\mu\nu} dx^\mu dx^\nu \)<br>
+				\( ds^2 = g_{\mu\nu} {dx^\mu \over d\tau} {dx^\nu \over d\tau} {d\tau}^2 \)<br>
+				\( ds = \sqrt{g_{\mu\nu} {dx^\mu \over d\tau} {dx^\nu \over d\tau}} d\tau \)<br>
+				\( \int ds = \int \sqrt{g_{\mu\nu} {dx^\mu \over d\tau} {dx^\nu \over d\tau}} d\tau \)<br>
+				\( s = \int \sqrt{g_{\mu\nu} {dx^\mu \over d\tau} {dx^\nu \over d\tau}} d\tau \)<br>
+				This equation looks awfully familiar to the arclength equation.
+				Turns out if we have a coordinate chart to describe the curved surface that the line lies upon then we can simplify the math even further.
+				Let \( {\vec{r}}(x^\mu) \) be that coordinate chart.
+				Then we can define \(g_{\mu \nu} = {{d\vec{r}} \over {dx^\mu}} \cdot {{d\vec{r}} \over {dx^\nu}} \) and get a more exact definition:<br>
+				\( s = \int \sqrt{ {d{\vec{r}} \over {dx^\mu}} \cdot {d{\vec{r}} \over {dx^\nu}} {dx^\mu \over d\tau} {dx^\nu \over d\tau}} d\tau \)<br>
+				\( s = \int \sqrt{ {d{\vec{r}} \over {dx^\mu}} {dx^\mu \over d\tau} \cdot {d{\vec{r}} \over {dx^\nu}} {dx^\nu \over d\tau}} d\tau \)<br>
+				\( s = \int \sqrt{ {d{\vec{r}} \over {d\tau}} \cdot {d{\vec{r}} \over {d\tau}} } d\tau \)<br>
+				\( s = \int \sqrt{ ||{d\vec{r} \over d\tau}||^2 } d\tau \)<br>
+				\( s = \int ||{d\vec{r} \over d\tau}|| d\tau \)<br>
+				And there you have the arclength equation recovered from the line element equation.
+				Notice that a coordinate chart is not always available for every metric, which is one reason why the line element definition is more popular.<br>
+				<br>
+				<h3>The Geodesic Equation</h3>
+				So how does one find the coordinates of path that light travels through a curved spacetime?  Enter the world of geodesics.
+				Geodesics calculate the path that a straight line takes over an arbitrarily curved surface.
+				The geodesic equation is described as
+				\( {\ddot x}^\mu + {\Gamma^\mu}_{\alpha \beta} {\dot x}^\alpha {\dot x}^\beta = 0 \)
+				where \( {\Gamma^\mu}_{\alpha \beta} \) is the Christoffel Symbol of the Second Kind.
+				One of a few ways to derive the geodesic equation is to extremalize the action of the arclength (squared):
+				Let \( I = \int g_{\mu \nu} {\dot x}^\mu {\dot x}^\nu \) and then solve for \( {{\delta I} \over {\delta x^\alpha}} = 0\).
+				I'll leave that one to you.  Actually it's here in the HTML comments.  I'm just too lazy to transpose it to LaTeX.<br>
+				<!--
+				
+				I = int g_uv x'^u x'^v
+				delta I = delta int g_uv x'^u x'^v dlambda	<- apply integral to both sides
+				delta I = delta g_uv x'^u x'^v + g_uv (delta x'^u x'^v + x'^u delta x'^v) dlambda		<- delta int == int delta, the distribute
+				delta I = int delta g_uv x'^u x'^v - delta x^u (g'_uv x'^v + g_uv x''^v) - delta x^v (g'_uv x'^u g_uv x''^u) dlambda, 
+					<- this is with the total integrals of the integration by parts thrown away
+					for some reason about the endpoints of the integral being arbitrary yet the integral always equaling zero ... or something
+				delta I = int delta g_uv x'u x'^v - delta x^v (g'_vu x'^u + g_vu x''^u) - delta x^v (g'_uv x'^u + g_uv x''^u) dlambda 	<- second term swap u's and v's (they're both summed indexes so you can do this)
+				delta I = int delta g_uv x'^u x'^v - 2 delta x^v (g'_uv x'^u + g_uv x''^u) dlambda
+				delta I / delta x^s = delta g_uv / delta x^s x'^u x'^v - 2 delta^u_s (g'_uv x'^v + g_uv x''^v)
+				delta I / delta x^s = delta g_uv / delta x^s x'^u x'^v - 2 (g'_sv x'^v + g_sv x''^v)
+				g^as delta I / delta x^s = g^as delta g_uv / delta x^s x'^u x'^v - 2(g^as g'_sv x'^v + x''^a)
+				solve for delta I / delta x^s = 0
+				x''^a + g^as g'_sb x'^b - 1/2 g^as delta g_bc / delta x^s x'^b x'^c = 0
+				x''^a + g^as dg_sb/dlambda x'^b - 1/2 g^as delta g_bc / delta x^s x'^b x'^c = 0
+				x''^a + g^as (dg_sb / dx^c x'^c x'^b - 1/2 g^as dg_bc / dx^s x'^b x'^c) = 0
+				x''^a + g^as (g_sb,c - 1/2 g_bc,s) x'^b x'^c = 0
+				x''^a + 1/2 g^as (g_bs,c + g_sb,c - g_bc,s) x'^b x'^c = 0		<- split g_sb,c and swap b's and c's in one of the two halves
+				x''^a + g^as conn_sbc x'^b x'^c = 0
+				x''^a + conn^a_bc = 0		<- geodesic equation.
+				-->
+				<br>
+				The Christoffel Symbol of the Second Kind can be defined as \( {\Gamma^\mu}_{\alpha \beta} = g^{\mu\nu} \Gamma_{\nu \alpha \beta} \),
+				for \(g^{\mu\nu}\) the inverse of the metric tensor and for \( {\Gamma_{\nu \alpha \beta}} \) the Christoffel Symbol of the First Kind.
+				The Christoffel Symbol of the First Kind is then defined as \( \Gamma_{\alpha \beta \gamma} = {1 \over 2} (g_{\alpha \beta, \gamma} + g_{\alpha \gamma, \beta} - g_{\beta \gamma, \alpha})\)
+				for comma derivative shorthand \(g_{\alpha \beta, \gamma} = {d \over {d {x^\gamma}}} g_{\alpha \beta}\).<br>
+				<br>
+				The geodesic equation gives us a relation between the first and second derivatives of the coordinates our test particle travelling along the geodesic.
+				It turns out the coefficients of the relation stored in \( {\Gamma^\mu}_{\alpha \beta} \) tend to be based on the particle position \(x^\mu\) as well.
+				In the end we get a formula for computing \({\ddot x}^\mu\) based on the \(x^\mu\) and \({\dot x}^\mu\).<br>
+				<br>
+				<h3>Implementation</h3>
+				Once we have these relations we can approximate them by simulating the position and velocity of light particles at arbitrary samples on the screen. 
+				The positions and velocities are updated using your favorite numeric integration method with the following equations:
+	\( {d \over {d\tau}} \left[ \matrix { x^\mu \\ {\dot x}^\mu } \right]
+	= \left[ \matrix{ {\dot x}^\mu \\ {\ddot x}^\mu } \right]
+	= \left[ \matrix{ {\dot x}^\mu \\ -{\Gamma^\mu}_{\alpha \beta} {\dot x}^\alpha {\dot x}^\beta } \right]
+	\).
+				<h3>Schwarzschild Geodesic</h3>
+				The Schwarzschild metric describes the curvature of spacetime around a spherical object.
+				The metric is given as \( {ds}^2 = -(1 - {2 M \over r}) {dt}^2 + (1 - {2 M \over r})^{-1} ({dx}^2 + {dy}^2 + {dz}^2) \)
+				for M the mass of the object.<br>
+				<h3>Kerr Geodesic</h3>
+				The Kerr metric describes the curvature of spacetime around a spherical rotating object.
+				The metric is given as \( {ds}^2 = -{dt}^2 + {dx}^2 + {dy}^2 + {dz}^2 + {2mr^3 \over {r^4 + a^2 z^2}} (dt + {{rx+ay}\over{a^2+r^2}} dx + {{ry-ax}\over{a^2+r^2}} dy + {z \over r} dz)^2 \)
+				for the mass \(m\), angular acceleration \(a\), and \(r\) is defined by \( x^2 + y^2 + z^2 = r^2 + a^2 (1 - {z^2 \over r^2}) \).<br>
+				<h3>Alcubierre Warp Bubble Geodesic</h3>
+				The Alcubierre warp bubble metric describes the curvature of spacetime around a warp bubble.
+				The metric is given as \( {ds}^2 = ({v_s}^2 f(r_s(t))^2 - 1) {dt}^2 - 2 v_s f(r_s) {dx} {dt} + {dx}^2 + {dy}^2 + {dz}^2 \)
+				for \( f(r_s) = (tanh(\sigma(r_s + R)) - tanh(\sigma(r_s - R))) / (2 tanh(\sigma R)) \),
+				\(r_s = \sqrt{(x - x_s)^2 + y^2 + z^2} \),
+				\(x_s\) the warp bubble distance,
+				\(v_s\) the warp bubble velocity,
+				R the warp bubble radius,
+				and \( \sigma \) the warp bubble thickness.<br>
+			</div>
 		</div>
 		<div id='webglfail' style='display:none'>
 			Sorry, your browser does not support WebGL<br>
