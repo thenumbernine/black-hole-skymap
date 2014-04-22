@@ -174,11 +174,28 @@ var skyTexFilenames = [
 
 var glMaxCubeMapTextureSize;
 
-var panel;
 var canvas;
 var gl;
 function main1() {
-	panel = $('#panel');	
+	$('#panelButton').click(function() {
+		var panel = $('#panel');	
+		if (panel.css('display') == 'none') {
+			panel.show();
+			$('#info').hide();
+		} else {
+			panel.hide();
+		}
+	});
+	$('#infoButton').click(function() {
+		var info = $('#info');
+		if (info.css('display') == 'none') {
+			info.show();
+			$('#panel').hide();
+		} else {
+			info.hide();
+		}
+	});
+	
 	canvas = $('<canvas>', {
 		css : {
 			left : 0,
@@ -240,11 +257,11 @@ function main1() {
 	try {
 		gl = GL.init(canvas);
 	} catch (e) {
-		panel.remove();
 		$(canvas).remove();
 		$('#webglfail').show();
 		throw e;
 	}
+	$('#menu').show();
 	
 	glMaxCubeMapTextureSize = gl.getParameter(gl.MAX_CUBE_MAP_TEXTURE_SIZE);
 
