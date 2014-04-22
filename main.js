@@ -89,6 +89,16 @@ function resize() {
 	canvas.width = window.innerWidth;
 	canvas.height = window.innerHeight;
 	GL.resize();
+
+	var info = $('#info');
+	var width = window.innerWidth 
+		- parseInt(info.css('padding-left'))
+		- parseInt(info.css('padding-right0'));
+	info.css(width + 'px');
+	var height = window.innerHeight
+		- parseInt(info.css('padding-top'))
+		- parseInt(info.css('padding-bottom'));
+	info.height(height - 32);
 }
 
 // render loop
