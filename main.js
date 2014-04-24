@@ -93,8 +93,8 @@ function resize() {
 	var info = $('#info');
 	var width = window.innerWidth 
 		- parseInt(info.css('padding-left'))
-		- parseInt(info.css('padding-right0'));
-	info.css(width + 'px');
+		- parseInt(info.css('padding-right'));
+	info.width(width);
 	var height = window.innerHeight
 		- parseInt(info.css('padding-top'))
 		- parseInt(info.css('padding-bottom'));
