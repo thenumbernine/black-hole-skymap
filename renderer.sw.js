@@ -66,12 +66,12 @@ const mat3 viewMatrix = mat3(
 	0., -1., 0.);
 
 uniform vec4 viewAngle;
-vec3 qtransform( vec4 q, vec3 v ){ 
-	return v + 2.0*cross(cross(v, q.xyz ) + q.w*v, q.xyz);
+vec3 quatRotate(vec4 q, vec3 v) { 
+	return v + 2. * cross(cross(v, q.xyz) - q.w * v, q.xyz);
 }
 void main() {
 	vec3 dir = textureCube(lightVelTex, vertexv).xyz * 2. - 1.;
-	dir = qtransform(vec4(viewAngle.xyz, -viewAngle.w), viewMatrix * dir);
+	dir = quatRotate(viewAngle, viewMatrix * dir);
 	gl_FragColor = textureCube(skyTex, dir);
 	gl_FragColor.w = 1.; 
 }

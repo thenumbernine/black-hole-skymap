@@ -352,13 +352,13 @@ const mat3 viewMatrix = mat3(
 	0., 0., -1.,
 	1., 0., 0., 
 	0., -1., 0.);
-vec3 qtransform( vec4 q, vec3 v ){ 
-	return v + 2.0*cross(cross(v, q.xyz ) + q.w*v, q.xyz);
+vec3 quatRotate(vec4 q, vec3 v) { 
+	return v + 2. * cross(cross(v, q.xyz) - q.w * v, q.xyz);
 }
 void main() {
 	uv = vertex;
 	vec3 vtx3 = vec3(vertex * 2. - 1., 1.);
-	vtx3 = qtransform(angle, vtx3);
+	vtx3 = quatRotate(vec4(angle.xyz, -angle.w), vtx3);
 	vtx3 = viewMatrix * vtx3;
 	vec4 vtx4 = vec4(vtx3, 1.);
 	gl_Position = projMat * vtx4;
@@ -374,13 +374,13 @@ const mat3 viewMatrixInv = mat3(
 	0., 1., 0.,
 	0., 0., -1.,
 	-1., 0., 0.);
-vec3 qtransform( vec4 q, vec3 v ){ 
-	return v + 2.0*cross(cross(v, q.xyz) + q.w*v, q.xyz);
+vec3 quatRotate( vec4 q, vec3 v ){ 
+	return v + 2. * cross(cross(v, q.xyz) - q.w * v, q.xyz);
 }
 void main() {
 	vec3 dir = texture2D(lightVelTex, uv).xyz;
 	dir = viewMatrixInv * viewMatrixInv * dir;
-	dir = qtransform(vec4(viewAngle.xyz, -viewAngle.w), dir);
+	dir = quatRotate(viewAngle.xyz, dir);
 	gl_FragColor.xyz = textureCube(skyTex, dir).xyz;
 	gl_FragColor.w = 1.; 
 }*/}),
