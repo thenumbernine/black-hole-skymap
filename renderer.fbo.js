@@ -374,13 +374,13 @@ const mat3 viewMatrixInv = mat3(
 	0., 1., 0.,
 	0., 0., -1.,
 	-1., 0., 0.);
-vec3 quatRotate( vec4 q, vec3 v ){ 
+vec3 quatRotate(vec4 q, vec3 v) { 
 	return v + 2. * cross(cross(v, q.xyz) - q.w * v, q.xyz);
 }
 void main() {
 	vec3 dir = texture2D(lightVelTex, uv).xyz;
 	dir = viewMatrixInv * viewMatrixInv * dir;
-	dir = quatRotate(viewAngle.xyz, dir);
+	dir = quatRotate(viewAngle, dir);
 	gl_FragColor.xyz = textureCube(skyTex, dir).xyz;
 	gl_FragColor.w = 1.; 
 }*/}),
