@@ -1,5 +1,7 @@
 black hole raytrace simulator
 
+http://christopheremoore.net/black-hole-skymap/
+
 raytraces relativistic phenomena such as black holes and Alcubierre warp drive bubbles
 
 does so by iterating the 4D rays of light through geodesics of arbitrary geometry.
