@@ -72,7 +72,7 @@ var rendererClassNames = [
 var renderer;
 var rendererClassName;
 (function(){
-	rendererClassName = 'GeodesicSWRenderer';
+	rendererClassName = 'GeodesicFBORenderer';
 	var classname = $.url().param('renderer');
 	if (classname) {
 		rendererClassName = classname;
