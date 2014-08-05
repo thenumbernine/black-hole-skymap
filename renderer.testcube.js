@@ -1,7 +1,10 @@
 GeodesicTestCubeRenderer = makeClass({
-	testInit : function() {},
+	init : function(renderer) {
+		this.renderer = renderer;
+	},
 	initScene : function(skyTex) {
 		var cubeShader = new GL.ShaderProgram({
+			context : this.renderer.context,
 			vertexPrecision : 'best',
 			vertexCode : mlstr(function(){/*
 attribute vec3 vertex;
@@ -42,10 +45,12 @@ void main() {
 		}
 
 		var cubeVtxBuf = new GL.ArrayBuffer({
+			context : this.renderer.context,
 			data : cubeVtxArray 
 		});
 
 		var cubeIndexBuf = new GL.ElementArrayBuffer({
+			context : this.renderer.context,
 			data : [
 				5,7,3,3,1,5,		// <- each value has the x,y,z in the 0,1,2 bits (off = 0, on = 1)
 				6,4,0,0,2,6,
@@ -57,12 +62,14 @@ void main() {
 		});
 
 		var cubeObj = new GL.SceneObject({
+			context : this.renderer.context,
+			scene : this.renderer.scene,
 			mode : gl.TRIANGLES,
 			attrs : {
 				vertex : cubeVtxBuf
 			},
 			uniforms : {
-				viewAngle : GL.canvasRenderer.view.angle
+				viewAngle : this.renderer.view.angle
 			},
 			indexes : cubeIndexBuf,
 			shader : cubeShader,
@@ -74,6 +81,7 @@ void main() {
 	resetField : function() {},
 
 	update : function() {
-		GL.canvasRenderer.draw();
+		this.renderer.draw();
 	}
 });
+

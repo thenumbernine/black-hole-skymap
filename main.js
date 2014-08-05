@@ -76,15 +76,6 @@ var skyboxRendererClassNames = [
 
 var skyboxRenderer;
 var skyboxRendererClassName;
-(function(){
-	skyboxRendererClassName = 'GeodesicFBORenderer';
-	var classname = $.url().param('renderer');
-	if (classname) {
-		skyboxRendererClassName = classname;
-	}
-	if (skyboxRendererClassNames.indexOf(skyboxRendererClassName) == -1) throw "unable to find skybox renderer named "+skyboxRendererClassName;
-	skyboxRenderer = new (window[skyboxRendererClassName])();
-})();
 
 //I would like to eventually instanciate all renderers and allow them to be toggled at runtime
 //however courtesy of the scenegraph's globals (which I am not too happy about my current design), this will take a bit more work
@@ -157,6 +148,7 @@ function main2() {
 
 	console.log('creating skyTex');
 	var skyTex = new GL.TextureCube({
+		context : gl,
 		flipY : true,
 		generateMipmap : true,
 		magFilter : gl.LINEAR,
@@ -257,6 +249,13 @@ function main1() {
 		});
 	});
 
+	skyboxRendererClassName = 'GeodesicFBORenderer';
+	var classname = $.url().param('renderer');
+	if (classname) {
+		skyboxRendererClassName = classname;
+	}
+	if (skyboxRendererClassNames.indexOf(skyboxRendererClassName) == -1) throw "unable to find skybox renderer named "+skyboxRendererClassName;
+
 	$.each(skyboxRendererClassNames, function(i,name) {
 		var radio = $('#' + name);
 		radio.click(function() {
@@ -266,9 +265,8 @@ function main1() {
 	});
 
 	try {
-		GL.init(canvas);
-		renderer = GL.canvasRenderer;
-		gl = renderer.gl;
+		renderer = new GL.CanvasRenderer({canvas:canvas});
+		gl = renderer.context;
 	} catch (e) {
 		$(canvas).remove();
 		$('#webglfail').show();
@@ -282,7 +280,7 @@ function main1() {
 		skyboxRenderer.resetField();
 	});
 
-	skyboxRenderer.testInit();
+	skyboxRenderer = new (window[skyboxRendererClassName])(renderer);
 
 	gl.disable(gl.DITHER);
 

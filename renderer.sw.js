@@ -12,8 +12,11 @@ GeodesicSWRenderer = makeClass({
 	//...or do some sort of adaptive thing ...
 	lightTexWidth : 256,
 	lightTexHeight : 256,
-	
-	testInit : function() {},
+
+	init : function(renderer) {
+		this.renderer = renderer;
+	},
+
 	initScene : function(skyTex) {
 		if (this.lightTexWidth > glMaxCubeMapTextureSize || this.lightTexHeight > glMaxCubeMapTextureSize) {
 			throw "light tex size "+this.lightTexWidth+"x"+this.lightTexHeight+" cannot exceed "+glMaxCubeMapTextureSize;
@@ -23,6 +26,7 @@ GeodesicSWRenderer = makeClass({
 			this.lightVelTexData[side] = new Uint8Array(3 * this.lightTexWidth * this.lightTexHeight);
 		}	
 		this.lightVelTex = new GL.TextureCube({
+			context : this.renderer.context,
 			internalFormat : gl.RGB,
 			format : gl.RGB,
 			type : gl.UNSIGNED_BYTE,
@@ -41,6 +45,7 @@ GeodesicSWRenderer = makeClass({
 		this.lightBuf = new Float32Array(6 * 4 * 2 * this.lightTexWidth * this.lightTexHeight);
 
 		var cubeShader = new GL.ShaderProgram({
+			context : this.renderer.context,
 			vertexPrecision : 'best',
 			vertexCode : mlstr(function(){/*
 attribute vec3 vertex;
@@ -90,10 +95,12 @@ void main() {
 		}
 
 		cubeVtxBuf = new GL.ArrayBuffer({
+			context : this.renderer.context,
 			data : cubeVtxArray 
 		});
 
 		var cubeIndexBuf = new GL.ElementArrayBuffer({
+			context : this.renderer.context,
 			data : [
 				5,7,3,3,1,5,		// <- each value has the x,y,z in the 0,1,2 bits (off = 0, on = 1)
 				6,4,0,0,2,6,
@@ -105,12 +112,14 @@ void main() {
 		});
 
 		var cubeObj = new GL.SceneObject({
+			context : this.renderer.context,
+			scene : this.renderer.scene,
 			mode : gl.TRIANGLES,
 			attrs : {
 				vertex : cubeVtxBuf
 			},
 			uniforms : {
-				viewAngle : GL.canvasRenderer.view.angle
+				viewAngle : this.renderer.view.angle
 			},
 			indexes : cubeIndexBuf,
 			shader : cubeShader,
@@ -314,7 +323,7 @@ void main() {
 	},
 
 	update : function() {
-		GL.canvasRenderer.draw();
+		this.renderer.draw();
 	}
 });
 

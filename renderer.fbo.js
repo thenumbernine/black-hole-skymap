@@ -263,11 +263,13 @@ void main() {
 		};
 	},
 
-	testInit : function() {
-		if (!gl.getExtension('OES_texture_float')) {
+	init : function(renderer) {
+		this.renderer = renderer;
+		if (!this.renderer.context.getExtension('OES_texture_float')) {
 			throw 'This requires OES_texture_float';
 		}
 	},
+	
 	initScene : function(skyTex) {
 		var thiz = this;
 		$.each(thiz.lightPosVelChannels, function(_,channel) {
@@ -290,6 +292,7 @@ void main() {
 				channel.fbos[history] = fbos;
 				for (var side = 0; side < 6; ++side) {
 					var tex = new GL.Texture2D({
+						context : thiz.renderer.context,
 						internalFormat : gl.RGBA,
 						format : gl.RGBA,
 						type : gl.FLOAT,
@@ -304,7 +307,9 @@ void main() {
 					});
 					texs[side] = tex;
 					
-					var fbo = new GL.Framebuffer();
+					var fbo = new GL.Framebuffer({
+						context : thiz.renderer.context,
+					});
 					gl.bindFramebuffer(gl.FRAMEBUFFER, fbo.obj);
 					gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, tex.obj, 0);
 					gl.bindFramebuffer(gl.FRAMEBUFFER, null);
@@ -330,6 +335,7 @@ void main() {
 					var shflags = flags.clone();
 					shflags.push(shaderType);
 					var args = thiz.getShaderProgramArgsForFlags(shflags);
+					args.context = thiz.renderer.context;
 					args.uniforms = {
 						lightPosTex : 0,
 						lightVelTex : 1
@@ -342,6 +348,7 @@ void main() {
 		});
 
 		var cubeShader = new GL.ShaderProgram({
+			context : this.renderer.context,
 			vertexPrecision : 'best',
 			vertexCode : mlstr(function(){/*
 attribute vec2 vertex;
@@ -395,13 +402,15 @@ void main() {
 		this.cubeSides = [];
 		for (var side = 0; side < 6; ++side) {
 			this.cubeSides[side] = new GL.SceneObject({
+				context : this.renderer.context,
+				scene : this.renderer.scene,
 				//geometry : GL.unitQuad.geometry,
 				mode : gl.TRIANGLE_STRIP,
 				attrs : {
 					vertex : GL.unitQuadVertexBuffer
 				},
 				uniforms : {
-					viewAngle : GL.canvasRenderer.view.angle,
+					viewAngle : this.renderer.view.angle,
 					angle : angleForSide[side]
 				},
 				shader : cubeShader,
@@ -440,7 +449,7 @@ void main() {
 				});
 			}
 		});
-		gl.viewport(0, 0, GL.canvasRenderer.canvas.width, GL.canvasRenderer.canvas.height);
+		gl.viewport(0, 0, this.renderer.canvas.width, this.renderer.canvas.height);
 	},
 	
 	updateLightPosTex : function() {	
@@ -478,7 +487,7 @@ void main() {
 				});
 			}
 		});
-		gl.viewport(0, 0, GL.canvasRenderer.canvas.width, GL.canvasRenderer.canvas.height);
+		gl.viewport(0, 0, this.renderer.canvas.width, this.renderer.canvas.height);
 		$.each(this.lightPosVelChannels, function(_,channel) {
 			var tmp;
 			tmp = channel.texs[0];
@@ -508,7 +517,7 @@ void main() {
 			this.cubeSides[side].texs[1] = this.lightPosVelChannels[1].texs[0][side];
 		}
 
-		GL.canvasRenderer.draw();	
+		this.renderer.draw();	
 		
 		//turn off magnification filter
 		for (var side = 0; side < 6; ++side) {
@@ -519,7 +528,5 @@ void main() {
 			gl.bindTexture(gl.TEXTURE_2D, null);
 		}	
 	}
-
 });
-
 
