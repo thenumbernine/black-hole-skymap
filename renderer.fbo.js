@@ -404,10 +404,10 @@ void main() {
 			this.cubeSides[side] = new GL.SceneObject({
 				context : this.renderer.context,
 				scene : this.renderer.scene,
-				//geometry : GL.unitQuad.geometry,
+				//geometry : renderer.unitQuad.geometry,
 				mode : gl.TRIANGLE_STRIP,
 				attrs : {
-					vertex : GL.unitQuadVertexBuffer
+					vertex : renderer.unitQuadVertexBuffer
 				},
 				uniforms : {
 					viewAngle : this.renderer.view.angle,
@@ -441,7 +441,7 @@ void main() {
 				var fbo = channel.fbos[0][side];
 				fbo.draw({
 					callback:function(){
-						GL.unitQuad.draw({
+						renderer.unitQuad.draw({
 							shader:shader,
 							uniforms:uniforms
 						});
@@ -475,7 +475,7 @@ void main() {
 				var fbo = channel.fbos[1][side];
 				fbo.draw({
 					callback:function(){
-						GL.unitQuad.draw({
+						renderer.unitQuad.draw({
 							shader:shader,
 							uniforms:uniforms,
 							texs:[
