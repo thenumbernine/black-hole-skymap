@@ -1,3 +1,8 @@
+var glMaxCubeMapTextureSize;
+var canvas;
+var gl;
+var renderer;
+
 var objectTypes = ['Black Hole', 'Alcubierre Warp Drive Bubble'];
 var objectType = objectTypes[0];
 var objectDist = 10;
@@ -63,22 +68,22 @@ var angleForSide = [
 
 
 //names of all renderers
-var rendererClassNames = [
+var skyboxRendererClassNames = [
 	'GeodesicTestCubeRenderer',
 	'GeodesicSWRenderer',
 	'GeodesicFBORenderer'
 ];
 
-var renderer;
-var rendererClassName;
+var skyboxRenderer;
+var skyboxRendererClassName;
 (function(){
-	rendererClassName = 'GeodesicFBORenderer';
+	skyboxRendererClassName = 'GeodesicFBORenderer';
 	var classname = $.url().param('renderer');
 	if (classname) {
-		rendererClassName = classname;
+		skyboxRendererClassName = classname;
 	}
-	if (rendererClassNames.indexOf(rendererClassName) == -1) throw "unable to find renderer named "+rendererClassName;
-	renderer = new (window[rendererClassName])();
+	if (skyboxRendererClassNames.indexOf(skyboxRendererClassName) == -1) throw "unable to find skybox renderer named "+skyboxRendererClassName;
+	skyboxRenderer = new (window[skyboxRendererClassName])();
 })();
 
 //I would like to eventually instanciate all renderers and allow them to be toggled at runtime
@@ -88,7 +93,7 @@ var rendererClassName;
 function resize() {
 	canvas.width = window.innerWidth;
 	canvas.height = window.innerHeight;
-	GL.resize();
+	renderer.resize();
 
 	var info = $('#info');
 	var width = window.innerWidth 
@@ -104,13 +109,13 @@ function resize() {
 // render loop
 
 function update() {
-	renderer.update();
+	skyboxRenderer.update();
 	requestAnimFrame(update);
 };
 
 var mouse;
 function main3(skyTex) {
-	renderer.initScene(skyTex);
+	skyboxRenderer.initScene(skyTex);
 
 	var tmpQ = quat.create();	
 	mouse = new Mouse3D({
@@ -119,17 +124,17 @@ function main3(skyTex) {
 			var rotAngle = Math.PI / 180 * .01 * Math.sqrt(dx*dx + dy*dy);
 			quat.setAxisAngle(tmpQ, [dy, dx, 0], rotAngle);
 
-			quat.mul(GL.view.angle, GL.view.angle, tmpQ);
-			quat.normalize(GL.view.angle, GL.view.angle);
+			quat.mul(renderer.view.angle, renderer.view.angle, tmpQ);
+			quat.normalize(renderer.view.angle, renderer.view.angle);
 		},
 		zoom : function(dz) {
-			GL.view.fovY *= Math.exp(-.0003 * dz);
-			GL.view.fovY = Math.clamp(GL.view.fovY, 1, 179);
-			GL.updateProjection();
+			renderer.view.fovY *= Math.exp(-.0003 * dz);
+			renderer.view.fovY = Math.clamp(renderer.view.fovY, 1, 179);
+			renderer.updateProjection();
 		}
 	});
 
-	renderer.resetField();
+	skyboxRenderer.resetField();
 
 	$(window).resize(resize);
 	resize();
@@ -145,10 +150,10 @@ function main2() {
 	}
 	main2Initialized = true; 
 	
-	GL.view.zNear = .1;
-	GL.view.zFar = 100;
-	GL.view.fovY = 90;
-	quat.mul(GL.view.angle, /*90' x*/[SQRT_1_2,0,0,SQRT_1_2], /*90' -y*/[0,-SQRT_1_2,0,SQRT_1_2]);
+	renderer.view.zNear = .1;
+	renderer.view.zFar = 100;
+	renderer.view.fovY = 90;
+	quat.mul(renderer.view.angle, /*90' x*/[SQRT_1_2,0,0,SQRT_1_2], /*90' -y*/[0,-SQRT_1_2,0,SQRT_1_2]);
 
 	console.log('creating skyTex');
 	var skyTex = new GL.TextureCube({
@@ -182,10 +187,6 @@ var skyTexFilenames = [
 	'skytex/sky-visible-cube-zn.png'
 ];
 
-var glMaxCubeMapTextureSize;
-
-var canvas;
-var gl;
 function main1() {
 	$('#panelButton').click(function() {
 		var panel = $('#panel');	
@@ -236,7 +237,7 @@ function main1() {
 	$('#objectTypes').change(function() {
 		objectType = $('#objectTypes').val();
 		refreshObjectTypeParamDivs();
-		renderer.resetField();
+		skyboxRenderer.resetField();
 	});
 	refreshObjectTypeParamDivs();
 
@@ -256,16 +257,18 @@ function main1() {
 		});
 	});
 
-	$.each(rendererClassNames, function(i,name) {
+	$.each(skyboxRendererClassNames, function(i,name) {
 		var radio = $('#' + name);
 		radio.click(function() {
 			location.href = 'index.html?renderer=' + name;
 		});
-		if (name == rendererClassName) radio.attr('checked', 'checked');
+		if (name == skyboxRendererClassName) radio.attr('checked', 'checked');
 	});
 
 	try {
-		gl = GL.init(canvas);
+		GL.init(canvas);
+		renderer = GL.canvasRenderer;
+		gl = renderer.gl;
 	} catch (e) {
 		$(canvas).remove();
 		$('#webglfail').show();
@@ -276,10 +279,10 @@ function main1() {
 	glMaxCubeMapTextureSize = gl.getParameter(gl.MAX_CUBE_MAP_TEXTURE_SIZE);
 
 	$('#reset').click(function() {
-		renderer.resetField();
+		skyboxRenderer.resetField();
 	});
 
-	renderer.testInit();
+	skyboxRenderer.testInit();
 
 	gl.disable(gl.DITHER);
 

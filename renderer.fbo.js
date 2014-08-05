@@ -401,7 +401,7 @@ void main() {
 					vertex : GL.unitQuadVertexBuffer
 				},
 				uniforms : {
-					viewAngle : GL.view.angle,
+					viewAngle : GL.canvasRenderer.view.angle,
 					angle : angleForSide[side]
 				},
 				shader : cubeShader,
@@ -440,7 +440,7 @@ void main() {
 				});
 			}
 		});
-		gl.viewport(0, 0, GL.canvas.width, GL.canvas.height);
+		gl.viewport(0, 0, GL.canvasRenderer.canvas.width, GL.canvasRenderer.canvas.height);
 	},
 	
 	updateLightPosTex : function() {	
@@ -478,7 +478,7 @@ void main() {
 				});
 			}
 		});
-		gl.viewport(0, 0, GL.canvas.width, GL.canvas.height);
+		gl.viewport(0, 0, GL.canvasRenderer.canvas.width, GL.canvasRenderer.canvas.height);
 		$.each(this.lightPosVelChannels, function(_,channel) {
 			var tmp;
 			tmp = channel.texs[0];
@@ -508,7 +508,7 @@ void main() {
 			this.cubeSides[side].texs[1] = this.lightPosVelChannels[1].texs[0][side];
 		}
 
-		GL.draw();	
+		GL.canvasRenderer.draw();	
 		
 		//turn off magnification filter
 		for (var side = 0; side < 6; ++side) {

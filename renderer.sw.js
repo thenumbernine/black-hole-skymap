@@ -110,7 +110,7 @@ void main() {
 				vertex : cubeVtxBuf
 			},
 			uniforms : {
-				viewAngle : GL.view.angle
+				viewAngle : GL.canvasRenderer.view.angle
 			},
 			indexes : cubeIndexBuf,
 			shader : cubeShader,
@@ -314,7 +314,7 @@ void main() {
 	},
 
 	update : function() {
-		GL.draw();
+		GL.canvasRenderer.draw();
 	}
 });
 
