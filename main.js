@@ -1,7 +1,7 @@
 var glMaxCubeMapTextureSize;
 var canvas;
 var gl;
-var renderer;
+var glutil;
 
 var objectTypes = ['Black Hole', 'Alcubierre Warp Drive Bubble'];
 var objectType = objectTypes[0];
@@ -79,12 +79,12 @@ var skyboxRendererClassName;
 
 //I would like to eventually instanciate all renderers and allow them to be toggled at runtime
 //however courtesy of the scenegraph's globals (which I am not too happy about my current design), this will take a bit more work
-//so in the mean time, this will take a page reset every time the renderer changes
+//so in the mean time, this will take a page reset every time the glutil changes
 
 function resize() {
 	canvas.width = window.innerWidth;
 	canvas.height = window.innerHeight;
-	renderer.resize();
+	glutil.resize();
 
 	var info = $('#info');
 	var width = window.innerWidth 
@@ -115,13 +115,13 @@ function main3(skyTex) {
 			var rotAngle = Math.PI / 180 * .01 * Math.sqrt(dx*dx + dy*dy);
 			quat.setAxisAngle(tmpQ, [dy, dx, 0], rotAngle);
 
-			quat.mul(renderer.view.angle, renderer.view.angle, tmpQ);
-			quat.normalize(renderer.view.angle, renderer.view.angle);
+			quat.mul(glutil.view.angle, glutil.view.angle, tmpQ);
+			quat.normalize(glutil.view.angle, glutil.view.angle);
 		},
 		zoom : function(dz) {
-			renderer.view.fovY *= Math.exp(-.0003 * dz);
-			renderer.view.fovY = Math.clamp(renderer.view.fovY, 1, 179);
-			renderer.updateProjection();
+			glutil.view.fovY *= Math.exp(-.0003 * dz);
+			glutil.view.fovY = Math.clamp(glutil.view.fovY, 1, 179);
+			glutil.updateProjection();
 		}
 	});
 
@@ -141,14 +141,13 @@ function main2() {
 	}
 	main2Initialized = true; 
 	
-	renderer.view.zNear = .1;
-	renderer.view.zFar = 100;
-	renderer.view.fovY = 90;
-	quat.mul(renderer.view.angle, /*90' x*/[SQRT_1_2,0,0,SQRT_1_2], /*90' -y*/[0,-SQRT_1_2,0,SQRT_1_2]);
+	glutil.view.zNear = .1;
+	glutil.view.zFar = 100;
+	glutil.view.fovY = 90;
+	quat.mul(glutil.view.angle, /*90' x*/[SQRT_1_2,0,0,SQRT_1_2], /*90' -y*/[0,-SQRT_1_2,0,SQRT_1_2]);
 
 	console.log('creating skyTex');
-	var skyTex = new GL.TextureCube({
-		context : gl,
+	var skyTex = new glutil.TextureCube({
 		flipY : true,
 		generateMipmap : true,
 		magFilter : gl.LINEAR,
@@ -265,8 +264,8 @@ function main1() {
 	});
 
 	try {
-		renderer = new GL.CanvasRenderer({canvas:canvas});
-		gl = renderer.context;
+		glutil = new GLUtil({canvas:canvas});
+		gl = glutil.context;
 	} catch (e) {
 		$(canvas).remove();
 		$('#webglfail').show();
@@ -280,7 +279,7 @@ function main1() {
 		skyboxRenderer.resetField();
 	});
 
-	skyboxRenderer = new (window[skyboxRendererClassName])(renderer);
+	skyboxRenderer = new (window[skyboxRendererClassName])(glutil);
 
 	gl.disable(gl.DITHER);
 

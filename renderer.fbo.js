@@ -263,9 +263,9 @@ void main() {
 		};
 	},
 
-	init : function(renderer) {
-		this.renderer = renderer;
-		if (!this.renderer.context.getExtension('OES_texture_float')) {
+	init : function(glutil) {
+		this.glutil = glutil;
+		if (!this.glutil.context.getExtension('OES_texture_float')) {
 			throw 'This requires OES_texture_float';
 		}
 	},
@@ -291,8 +291,7 @@ void main() {
 				var fbos = [];
 				channel.fbos[history] = fbos;
 				for (var side = 0; side < 6; ++side) {
-					var tex = new GL.Texture2D({
-						context : thiz.renderer.context,
+					var tex = new thiz.glutil.Texture2D({
 						internalFormat : gl.RGBA,
 						format : gl.RGBA,
 						type : gl.FLOAT,
@@ -307,9 +306,7 @@ void main() {
 					});
 					texs[side] = tex;
 					
-					var fbo = new GL.Framebuffer({
-						context : thiz.renderer.context,
-					});
+					var fbo = new thiz.glutil.Framebuffer();
 					gl.bindFramebuffer(gl.FRAMEBUFFER, fbo.obj);
 					gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, tex.obj, 0);
 					gl.bindFramebuffer(gl.FRAMEBUFFER, null);
@@ -335,20 +332,19 @@ void main() {
 					var shflags = flags.clone();
 					shflags.push(shaderType);
 					var args = thiz.getShaderProgramArgsForFlags(shflags);
-					args.context = thiz.renderer.context;
+					args.context = thiz.glutil.context;
 					args.uniforms = {
 						lightPosTex : 0,
 						lightVelTex : 1
 					};
 					args.vertexPrecision = 'best';
 					args.fragmentPrecision = 'best';
-					channel.shaders[objType][shaderType] = new GL.ShaderProgram(args);
+					channel.shaders[objType][shaderType] = new thiz.glutil.ShaderProgram(args);
 				});
 			});
 		});
 
-		var cubeShader = new GL.ShaderProgram({
-			context : this.renderer.context,
+		var cubeShader = new this.glutil.ShaderProgram({
 			vertexPrecision : 'best',
 			vertexCode : mlstr(function(){/*
 attribute vec2 vertex;
@@ -401,16 +397,14 @@ void main() {
 		//I would use a cubemap but the Mali-400 doesn't seem to want to use them as 2D FBO targets ...
 		this.cubeSides = [];
 		for (var side = 0; side < 6; ++side) {
-			this.cubeSides[side] = new GL.SceneObject({
-				context : this.renderer.context,
-				scene : this.renderer.scene,
-				//geometry : renderer.unitQuad.geometry,
+			this.cubeSides[side] = new this.glutil.SceneObject({
+				//geometry : glutil.unitQuad.geometry,
 				mode : gl.TRIANGLE_STRIP,
 				attrs : {
-					vertex : renderer.unitQuadVertexBuffer
+					vertex : glutil.unitQuadVertexBuffer
 				},
 				uniforms : {
-					viewAngle : this.renderer.view.angle,
+					viewAngle : this.glutil.view.angle,
 					angle : angleForSide[side]
 				},
 				shader : cubeShader,
@@ -441,7 +435,7 @@ void main() {
 				var fbo = channel.fbos[0][side];
 				fbo.draw({
 					callback:function(){
-						renderer.unitQuad.draw({
+						glutil.unitQuad.draw({
 							shader:shader,
 							uniforms:uniforms
 						});
@@ -449,7 +443,7 @@ void main() {
 				});
 			}
 		});
-		gl.viewport(0, 0, this.renderer.canvas.width, this.renderer.canvas.height);
+		gl.viewport(0, 0, this.glutil.canvas.width, this.glutil.canvas.height);
 	},
 	
 	updateLightPosTex : function() {	
@@ -475,7 +469,7 @@ void main() {
 				var fbo = channel.fbos[1][side];
 				fbo.draw({
 					callback:function(){
-						renderer.unitQuad.draw({
+						glutil.unitQuad.draw({
 							shader:shader,
 							uniforms:uniforms,
 							texs:[
@@ -487,7 +481,7 @@ void main() {
 				});
 			}
 		});
-		gl.viewport(0, 0, this.renderer.canvas.width, this.renderer.canvas.height);
+		gl.viewport(0, 0, this.glutil.canvas.width, this.glutil.canvas.height);
 		$.each(this.lightPosVelChannels, function(_,channel) {
 			var tmp;
 			tmp = channel.texs[0];
@@ -517,7 +511,7 @@ void main() {
 			this.cubeSides[side].texs[1] = this.lightPosVelChannels[1].texs[0][side];
 		}
 
-		this.renderer.draw();	
+		this.glutil.draw();	
 		
 		//turn off magnification filter
 		for (var side = 0; side < 6; ++side) {

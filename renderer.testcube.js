@@ -1,10 +1,9 @@
 GeodesicTestCubeRenderer = makeClass({
-	init : function(renderer) {
-		this.renderer = renderer;
+	init : function(glutil) {
+		this.glutil = glutil;
 	},
 	initScene : function(skyTex) {
-		var cubeShader = new GL.ShaderProgram({
-			context : this.renderer.context,
+		var cubeShader = new this.glutil.ShaderProgram({
 			vertexPrecision : 'best',
 			vertexCode : mlstr(function(){/*
 attribute vec3 vertex;
@@ -44,13 +43,11 @@ void main() {
 			cubeVtxArray[2+3*i] = 2*((i>>2)&1)-1;
 		}
 
-		var cubeVtxBuf = new GL.ArrayBuffer({
-			context : this.renderer.context,
+		var cubeVtxBuf = new this.glutil.ArrayBuffer({
 			data : cubeVtxArray 
 		});
 
-		var cubeIndexBuf = new GL.ElementArrayBuffer({
-			context : this.renderer.context,
+		var cubeIndexBuf = new this.glutil.ElementArrayBuffer({
 			data : [
 				5,7,3,3,1,5,		// <- each value has the x,y,z in the 0,1,2 bits (off = 0, on = 1)
 				6,4,0,0,2,6,
@@ -61,15 +58,13 @@ void main() {
 			]
 		});
 
-		var cubeObj = new GL.SceneObject({
-			context : this.renderer.context,
-			scene : this.renderer.scene,
+		var cubeObj = new this.glutil.SceneObject({
 			mode : gl.TRIANGLES,
 			attrs : {
 				vertex : cubeVtxBuf
 			},
 			uniforms : {
-				viewAngle : this.renderer.view.angle
+				viewAngle : this.glutil.view.angle
 			},
 			indexes : cubeIndexBuf,
 			shader : cubeShader,
@@ -81,7 +76,7 @@ void main() {
 	resetField : function() {},
 
 	update : function() {
-		this.renderer.draw();
+		this.glutil.draw();
 	}
 });
 
