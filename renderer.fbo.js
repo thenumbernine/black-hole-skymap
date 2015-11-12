@@ -70,14 +70,16 @@ void main() {
 			code : mlstr(function(){/*
 //when initializing our metric:
 //g_ab v^a v^b = 0 for our metric g
-// (-1 + 2M/r) vt^2 + (vx^2 + vy^2 + vz^2) / (1 - 2M/r) = 0
-// (1 - 2M/r) vt^2 = (vx^2 + vy^2 + vz^2) / (1 - 2M/r)
-// vt^2 = (vx^2 + vy^2 + vz^2) / (1 - 2M/r)^2
-// vt = ||vx,vy,vz|| / (1 - 2M/r)
+// (-1 + 2M/r) vt^2 + v^i v^j (delta_ij + x^i x^j 2M / (r^2 (r - 2M)))
+// -(r - 2M)/r vt^2 + (|v|^2 + (v dot x)^2 2M / (r^2 (r - 2M)) )
+// vt^2 = (|v|^2 + (v dot x)^2 2M / (r^2 (r - 2M)) ) r/(r - 2M)
+	float vSq = dot(vel, vel);
 	vec3 pos = vec3(-objectDist, 0., 0.);
 	float r = length(pos);
-	float oneMinus2MOverR = 1. - 2. * blackHoleMass / r;
-	gl_FragColor.w = 1. / oneMinus2MOverR;
+	float rSq = r * r;
+	float vDotX = dot(vel, pos);
+	float R = 2. * blackHoleMass;
+	gl_FragColor.w = (vSq + vDotX * vDotX * R / (rSq * (r - R))) * r / (r - R);
 }
 */})
 		},
@@ -161,17 +163,15 @@ void main() {
 			flags : 'Black_Hole:iterate:vel:fsh',
 			code : mlstr(function(){/*
 	float r = length(pos.xyz);
-	float oneMinus2MOverR = 1. - 2.*blackHoleMass/r;			
 	float posDotVel = dot(pos.xyz, vel.xyz);
-	float velDotVel = dot(vel.xyz, vel.xyz);
-	float r2 = r * r;
-	float invR2M = 1. / (r * oneMinus2MOverR);
-	float rMinus2MOverR2 = oneMinus2MOverR / r;
-	float MOverR2 = blackHoleMass / r2;
-	gl_FragColor.x = vel.x - deltaLambda * MOverR2 * (rMinus2MOverR2 * pos.x * vel.w * vel.w + invR2M * (pos.x * velDotVel - 2. * vel.x * posDotVel));
-	gl_FragColor.y = vel.y - deltaLambda * MOverR2 * (rMinus2MOverR2 * pos.y * vel.w * vel.w + invR2M * (pos.y * velDotVel - 2. * vel.y * posDotVel));
-	gl_FragColor.z = vel.z - deltaLambda * MOverR2 * (rMinus2MOverR2 * pos.z * vel.w * vel.w + invR2M * (pos.z * velDotVel - 2. * vel.z * posDotVel));
-	gl_FragColor.w = vel.w + deltaLambda * 2. * MOverR2 * invR2M * posDotVel * vel.w;
+	float posDotVelSq = posDotVel * posDotVel;
+	float velSq = dot(vel.xyz, vel.xyz);
+	float R = 2. * blackHoleMass;
+	float rSq = r * r;
+	float vtSq = vel.w * vel.w;
+	float scale = (R / rSq) * (.5 * vtSq * (1. - R / r) + velSq - .5 * posDotVelSq * (3. * r - 2. * R) / (rSq * (r - R)));
+	gl_FragColor.xyz = vel.xyz - deltaLambda * pos.xyz * scale;
+	gl_FragColor.w = vel.w - deltaLambda * R / (rSq * (r - R)) * posDotVel * vel.w;
 }
 */})
 		},

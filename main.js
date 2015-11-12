@@ -6,7 +6,7 @@ var glutil;
 var objectTypes = ['Black Hole', 'Alcubierre Warp Drive Bubble'];
 var objectType = objectTypes[0];
 var objectDist = 10;
-var blackHoleMass = 1;
+var blackHoleMass = .1;
 var warpBubbleThickness = 1;
 var warpBubbleVelocity = .5;
 var warpBubbleRadius = 2;

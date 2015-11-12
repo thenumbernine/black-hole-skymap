@@ -162,9 +162,11 @@ void main() {
 						// vt^2 = (vx^2 + vy^2 + vz^2) / (1 - 2M/r)^2
 						// vt = ||vx,vy,vz|| / (1 - 2M/r)
 						pos[0] -= objectDist;	//center of metric is black hole origin
+						var vSq = vec3.dot(vel, vel);
 						var r = vec3.length(pos);
-						var oneMinus2MOverR = 1 - 2*blackHoleMass/r;
-						vel[3] = 1 / oneMinus2MOverR;
+						var R = 2 * blackHoleMass;
+						var vDotX = vec3.dot(vel, pos);
+						vel[3] = (vSq + vDotX * vDotX * R / (r * r * (r - R))) * r / (r - R);
 					} else if (objectType == 'Alcubierre Warp Drive Bubble') {
 						//g_ab v^a v^b = 0
 						//... later
@@ -236,17 +238,17 @@ void main() {
 						// Schwarzschild Cartesian metric
 						//aux variables:
 						var r = Math.sqrt(oldPx * oldPx + oldPy * oldPy + oldPz * oldPz);
-						var oneMinus2MOverR = 1 - 2*blackHoleMass/r;			
-						var posDotVel = oldPx * oldVx + oldPy * oldVy + oldPz * oldVz;
-						var velDotVel = oldVx * oldVx + oldVy * oldVy + oldVz * oldVz;
-						var r2 = r * r;
-						var invR2M = 1 / (r * oneMinus2MOverR);
-						var rMinus2MOverR2 = oneMinus2MOverR / r;
-						var MOverR2 = blackHoleMass / r2;
-						newVx = oldVx - deltaLambda * MOverR2 * (rMinus2MOverR2 * oldPx * oldVt * oldVt + invR2M * (oldPx * velDotVel - 2 * oldVx * posDotVel));
-						newVy = oldVy - deltaLambda * MOverR2 * (rMinus2MOverR2 * oldPy * oldVt * oldVt + invR2M * (oldPy * velDotVel - 2 * oldVy * posDotVel));
-						newVz = oldVz - deltaLambda * MOverR2 * (rMinus2MOverR2 * oldPz * oldVt * oldVt + invR2M * (oldPz * velDotVel - 2 * oldVz * posDotVel));
-						newVt = oldVt + deltaLambda * 2 * MOverR2 * invR2M * posDotVel * oldVt;
+						var posDotVel = oldPx * oldVx + oldPy * oldVy + oldPz * oldVz; 
+						var posDotVelSq = posDotVel * posDotVel;
+						var velSq = oldVx * oldVx + oldVy * oldVy + oldVz * oldVz; 
+						var R = 2. * blackHoleMass;
+						var rSq = r * r;
+						var vtSq = oldVt * oldVt; 
+						var scale = (R / rSq) * (.5 * vtSq * (1 - R / r) + velSq - .5 * posDotVelSq * (3. * r - 2. * R) / (rSq * (r - R)));
+						newVx = oldVx - deltaLambda * oldPx * scale;
+						newVy = oldVy - deltaLambda * oldPy * scale;
+						newVz = oldVz - deltaLambda * oldPz * scale;
+						newVt = oldVt - deltaLambda * R / (rSq * (r - R)) * posDotVel * oldVt;
 					} else if (objectType == 'Alcubierre Warp Drive Bubble') {
 						var rs = Math.sqrt((oldPx - objectDist) * (oldPx - objectDist) + oldPy * oldPy + oldPz * oldPz);
 						var sigmaFront = warpBubbleThickness * (rs + warpBubbleRadius);
