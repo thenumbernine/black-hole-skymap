@@ -169,7 +169,7 @@ void main() {
 	float R = 2. * blackHoleMass;
 	float rSq = r * r;
 	float vtSq = vel.w * vel.w;
-	float scale = (R / rSq) * (.5 * vtSq * (1. - R / r) + velSq - .5 * posDotVelSq * (3. * r - 2. * R) / (rSq * (r - R)));
+	float scale = (R / (r * rSq)) * (.5 * vtSq * (1. - R / r) + velSq - .5 * posDotVelSq * (3. * r - 2. * R) / (rSq * (r - R)));
 	gl_FragColor.xyz = vel.xyz - deltaLambda * pos.xyz * scale;
 	gl_FragColor.w = vel.w - deltaLambda * R / (rSq * (r - R)) * posDotVel * vel.w;
 }

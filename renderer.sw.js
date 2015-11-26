@@ -244,7 +244,7 @@ void main() {
 						var R = 2. * blackHoleMass;
 						var rSq = r * r;
 						var vtSq = oldVt * oldVt; 
-						var scale = (R / rSq) * (.5 * vtSq * (1 - R / r) + velSq - .5 * posDotVelSq * (3. * r - 2. * R) / (rSq * (r - R)));
+						var scale = (R / (rSq * r)) * (.5 * vtSq * (1 - R / r) + velSq - .5 * posDotVelSq * (3. * r - 2. * R) / (rSq * (r - R)));
 						newVx = oldVx - deltaLambda * oldPx * scale;
 						newVy = oldVy - deltaLambda * oldPy * scale;
 						newVz = oldVz - deltaLambda * oldPz * scale;
