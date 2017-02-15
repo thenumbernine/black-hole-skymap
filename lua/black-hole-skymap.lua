@@ -1,3 +1,5 @@
+#!/usr/bin/env luajit
+
 --[[
 cube map render
 shader that iterates along geodesic from the view plane backwards through time to infinity
@@ -22,21 +24,22 @@ conn^phi_theta_theta = -sin(phi) cos(phi)
 -phi'' = 2/r r' phi' - sin(phi) cos(phi) theta'^2
 --]]
 
-local openglapp = require 'openglapp'
+require 'ext'
+local ImGuiApp = require 'imguiapp'
 local bit = require 'bit'
 local ffi = require 'ffi'
-local gl = require 'ffi.gl'
+local gl = require 'ffi.OpenGL'
 local glu = require 'ffi.glu'
 local sdl = require 'ffi.sdl'
-
---local tw = require 'ffi.anttweakbar'
-
+local ig = require 'ffi.imgui'
 local Quat = require 'vec.quat'
 local vec2 = require 'vec.vec2'
 local vec3 = require 'vec.vec3'
-require 'glutil.tex'
-require 'glutil.shader'
-require 'glutil.pingpong'
+local GLTex2D = require 'gl.tex2d'
+local GLTexCube = require 'gl.texcube'
+local GLProgram = require 'gl.program'
+local FBO = require 'gl.fbo'
+local glreport = require 'gl.report'
 
 local skyTex
 local viewRot = Quat(0,math.sqrt(.5),0,math.sqrt(.5))*Quat(math.sqrt(.5),0,0,-math.sqrt(.5))
@@ -78,51 +81,35 @@ local uvs = {
 	vec2(0,1),
 }
 
-local deltaLambdaPtr = ffi.new('double[1]', 1.)
+local deltaLambdaPtr = ffi.new('float[1]', 1.)
 local iterationsPtr = ffi.new('int[1]', 1)
 
-local sdlVersion = ffi.new('SDL_version[1]')
-local sdlEventCopy = ffi.new('SDL_Event[1]')	-- for anttweakbar
-
-openglapp:run{
-	init = function()
-		sdl.SDL_GetVersion(sdlVersion)
-
-		if tw then
-			tw.TwInit(tw.TW_OPENGL, nil)
-
-			local viewWidth, viewHeight = openglapp:size()
-			tw.TwWindowSize(viewWidth, viewHeight)
+local App = class(ImGuiApp)
+function App:initGL()
+	App.super.initGL(self)
+	
+	skyTex = GLTexCube{
+		filenames = {
+			'../skytex/sky-infrared-cube-xp.png',
+			'../skytex/sky-infrared-cube-xn.png',
+			'../skytex/sky-infrared-cube-yp.png',
+			'../skytex/sky-infrared-cube-yn.png',
+			'../skytex/sky-infrared-cube-zp.png',
+			'../skytex/sky-infrared-cube-zn.png',
+		},
+		wrap={
+			s=gl.GL_CLAMP_TO_EDGE,
+			t=gl.GL_CLAMP_TO_EDGE,
+			r=gl.GL_CLAMP_TO_EDGE,
+		},
+		magFilter = gl.GL_LINEAR,
+		minFilter = gl.GL_LINEAR,
+	}
 		
-			tw.TwDefine("GLOBAL help='testing testing'");
-			local bar = tw.TwNewBar('Controls')
-			tw.TwAddVarRW(bar, 'deltalambda', tw.TW_TYPE_DOUBLE, deltaLambdaPtr, " label='delta lambda' min=0 max=10 step=0.01 keyIncr=l keyDecr=L help='delta lambda'")
-			tw.TwAddVarRW(bar, 'iterations', tw.TW_TYPE_INT32, iterationsPtr, " label='iterations' min=0 max=1000 step=1 keyIncr=i keyDecr=I help='iterations'")
-		end
-		
-		skyTex = TexCube{
-			filenames = {
-				'skytex/sky-infrared-cube-xp.png',
-				'skytex/sky-infrared-cube-xn.png',
-				'skytex/sky-infrared-cube-yp.png',
-				'skytex/sky-infrared-cube-yn.png',
-				'skytex/sky-infrared-cube-zp.png',
-				'skytex/sky-infrared-cube-zn.png',
-			},
-			wrap={
-				s=gl.GL_CLAMP_TO_EDGE,
-				t=gl.GL_CLAMP_TO_EDGE,
-				r=gl.GL_CLAMP_TO_EDGE,
-			},
-			magFilter = gl.GL_LINEAR,
-			minFilter = gl.GL_LINEAR,
-		}
-		
-		local shaderDefs = [[
+	local shaderDefs = [[
 #define DLAMBDA 0.1
 #define M_PI 3.14159265358979311599796346854418516159057617187500
 #define ITERATIONS 1
-
 
 #define SCHWARZSCHILD_SPHERIC
 //#define ALCUBIERRE
@@ -190,7 +177,7 @@ float sechSq(float x) {
 
 ]]
 
-		local initLightShaderVertexCode = shaderDefs .. [[
+	local initLightShaderVertexCode = shaderDefs .. [[
 varying vec3 pos;			
 void main() {
 	vec4 mvpos = gl_ModelViewMatrix * gl_Vertex;
@@ -199,7 +186,7 @@ void main() {
 }
 ]]
 
-		local initLightShaderFragmentCode = shaderDefs .. [[
+	local initLightShaderFragmentCode = shaderDefs .. [[
 varying vec3 pos;
 
 void main() {
@@ -227,31 +214,33 @@ void main() {
 }
 ]]
 		
-		initLightPosShader = ShaderProgram{
-			vertexCode = initLightShaderVertexCode,
-			fragmentCode = initLightShaderFragmentCode:gsub('$assign', 'gl_FragColor = rel;'),
-		}
+	initLightPosShader = GLProgram{
+		vertexCode = initLightShaderVertexCode,
+		fragmentCode = initLightShaderFragmentCode:gsub('$assign', 'gl_FragColor = rel;'),
+	}
+	
+	initLightVelShader = GLProgram{
+		vertexCode = initLightShaderVertexCode,
+		fragmentCode = initLightShaderFragmentCode:gsub('$assign', 'gl_FragColor = relDiff;'),
+	}
 		
-		initLightVelShader = ShaderProgram{
-			vertexCode = initLightShaderVertexCode,
-			fragmentCode = initLightShaderFragmentCode:gsub('$assign', 'gl_FragColor = relDiff;'),
-		}
-		
-		local lightRes = 1024
-		for _,texs in ipairs{lightPosTexs, lightVelTexs} do
-			for i=1,2 do
-				texs[i] = Tex2D{
-					width=lightRes,
-					height=lightRes,
-					internalFormat=gl.GL_RGBA_FLOAT32,
-					minFilter=gl.GL_NEAREST,
-					magFilter=gl.GL_NEAREST,
-				}
-			end
+	local lightRes = 1024
+	for _,texs in ipairs{lightPosTexs, lightVelTexs} do
+		for i=1,2 do
+			texs[i] = GLTex2D{
+				width=lightRes,
+				height=lightRes,
+				type=gl.GL_RGBA,
+				format=gl.GL_RGBA,
+				internalFormat=gl.GL_RGBA32F,
+				minFilter=gl.GL_NEAREST,
+				magFilter=gl.GL_NEAREST,
+			}
 		end
-		fbo = FBO{width=lightRes, height=lightRes}
-		
-		local iterateLightShaderVertexCode = [[
+	end
+	fbo = FBO{width=lightRes, height=lightRes}
+
+	local iterateLightShaderVertexCode = [[
 varying vec2 tc;
 void main() {
 	tc = gl_Vertex.xy;
@@ -259,7 +248,7 @@ void main() {
 }
 ]]
 
-		local iterateLightShaderFragmentCode = shaderDefs .. [[
+	local iterateLightShaderFragmentCode = shaderDefs .. [[
 
 uniform sampler2D posTex;
 uniform sampler2D velTex;
@@ -337,23 +326,23 @@ void main() {
 	$assign
 }
 ]]
-		local iterateLightShaderUniforms = {
-			posTex = 0,
-			velTex = 1,
-		}
-		
-		iterateLightPosShader = ShaderProgram{
-			vertexCode = iterateLightShaderVertexCode,
-			fragmentCode = iterateLightShaderFragmentCode:gsub('$assign', 'gl_FragColor = rel;'),
-			uniforms = iterateLightShaderUniforms,
-		}
-		
-		iterateLightVelShader = ShaderProgram{
-			vertexCode = iterateLightShaderVertexCode,
-			fragmentCode = iterateLightShaderFragmentCode:gsub('$assign', 'gl_FragColor = relDiff;'),
-			uniforms = iterateLightShaderUniforms,
-		}
-		
+	local iterateLightShaderUniforms = {
+		posTex = 0,
+		velTex = 1,
+	}
+	
+	iterateLightPosShader = GLProgram{
+		vertexCode = iterateLightShaderVertexCode,
+		fragmentCode = iterateLightShaderFragmentCode:gsub('$assign', 'gl_FragColor = rel;'),
+		uniforms = iterateLightShaderUniforms,
+	}
+	
+	iterateLightVelShader = GLProgram{
+		vertexCode = iterateLightShaderVertexCode,
+		fragmentCode = iterateLightShaderFragmentCode:gsub('$assign', 'gl_FragColor = relDiff;'),
+		uniforms = iterateLightShaderUniforms,
+	}
+	
 		
 --[[
 how it'll work ...
@@ -363,15 +352,15 @@ how it'll work ...
 
 you could do the iteration in the shader loop, or you could use a fbo to store state information ...
 --]]
-		drawLightShader = ShaderProgram{
-			vertexCode=[[
+	drawLightShader = GLProgram{
+		vertexCode=[[
 varying vec2 tc;
 void main() {
 	tc = gl_Vertex.xy;
 	gl_Position = ftransform();
 }
 ]],
-			fragmentCode = shaderDefs .. [[
+		fragmentCode = shaderDefs .. [[
 uniform sampler2D posTex;
 uniform samplerCube cubeTex;
 varying vec2 tc;
@@ -404,136 +393,104 @@ void main() {
 	}
 }
 ]],
-			uniforms = {
-				posTex = 0,
-				cubeTex = 1,
-			},
-		}
-		
-		ShaderProgram:useNone()
-		
-		gl.glClearColor(.3, .3, .3, 1)		
-	end,
-	event = function(event)
-		sdlEventCopy[0] = event	-- memcpy I hope
-		if tw and 0 ~= tw.TwEventSDL(sdlEventCopy, sdlVersion[0].major, sdlVersion[0].minor) then return end
-		if event.type == sdl.SDL_MOUSEMOTION then
-			if leftButtonDown then
-				local idx = event.motion.xrel
-				local idy = event.motion.yrel
-				local magn = math.sqrt(idx * idx + idy * idy)
-				local dx = idx / magn
-				local dy = idy / magn
-				local r = Quat():fromAngleAxis(dy, dx, 0, -magn)
-				viewRot = (r * viewRot):normalize()
-				lightInitialized = false
-			end
-		elseif event.type == sdl.SDL_MOUSEBUTTONDOWN then
-			if event.button.button == sdl.SDL_BUTTON_LEFT then
-				leftButtonDown = true
-			elseif event.button.button == sdl.SDL_BUTTON_WHEELUP then
-				tanFov = tanFov * zoomFactor
-				lightInitialized = false
-			elseif event.button.button == sdl.SDL_BUTTON_WHEELDOWN then
-				tanFov = tanFov / zoomFactor
-				lightInitialized = false
-			end
-		elseif event.type == sdl.SDL_MOUSEBUTTONUP then
-			if event.button.button == sdl.SDL_BUTTON_LEFT then
-				leftButtonDown = false
-			end
-		elseif event.type == sdl.SDL_KEYDOWN then
-			if event.key.keysym.sym == sdl.SDLK_i then
-				doIteration = 2
-			elseif event.key.keysym.sym == sdl.SDLK_j then
-				doIteration = 1
-			end
-		end
-	end,
-	update = function()
-		local viewWidth, viewHeight = openglapp:size()
+		uniforms = {
+			posTex = 0,
+			cubeTex = 1,
+		},
+	}
 	
-		viewRot:toAngleAxis(viewAngleAxis)
-		
-		-- init light if necessary
-		if not lightInitialized then
-			lightInitialized = true
-		
-			gl.glViewport(0, 0, fbo.width, fbo.height)
-			local aspectRatio = viewWidth / viewHeight
-
-			gl.glMatrixMode(gl.GL_PROJECTION)
-			gl.glLoadIdentity()
-			gl.glFrustum(-zNear * aspectRatio * tanFov, zNear * aspectRatio * tanFov, -zNear * tanFov, zNear * tanFov, zNear, zFar)
-			gl.glMatrixMode(gl.GL_MODELVIEW)
-			gl.glLoadIdentity()
-			gl.glRotatef(-viewAngleAxis[4], viewAngleAxis[1], viewAngleAxis[2], viewAngleAxis[3])
-						
-			for _,args in ipairs{
-				{tex=lightPosTexs[1].id, shader=initLightPosShader},
-				{tex=lightVelTexs[1].id, shader=initLightVelShader},
-			} do
-				fbo:bind()
-				gl.glFramebufferTexture2D(gl.GL_FRAMEBUFFER, gl.GL_COLOR_ATTACHMENT0, gl.GL_TEXTURE_2D, args.tex, 0)
-				assert(checkFBO())
-				
-				args.shader:use()
-				gl.glBegin(gl.GL_QUADS)
-				for _,uv in ipairs(uvs) do
-					gl.glVertex3f((uv[1] - .5) * 2 * aspectRatio * tanFov,
-						(uv[2] - .5) * 2 * tanFov,
-						-1)
-				end
-				gl.glEnd()
-				ShaderProgram:useNone()
-
-				fbo:unbind()
-			end
+	gl.glClearColor(.3, .3, .3, 1)		
+end
+	
+function App:event(event, eventPtr)
+	App.super.event(self, event, eventPtr)
+	if event.type == sdl.SDL_MOUSEMOTION then
+		if leftButtonDown then
+			local idx = event.motion.xrel
+			local idy = event.motion.yrel
+			local magn = math.sqrt(idx * idx + idy * idy)
+			local dx = idx / magn
+			local dy = idy / magn
+			local r = Quat():fromAngleAxis(dy, dx, 0, -magn)
+			viewRot = (r * viewRot):normalize()
+			lightInitialized = false
 		end
-
-
-		
-		if doIteration ~= 0 then
-			if doIteration == 1 then doIteration = 0 end
-			--print('iterating...')
-			gl.glViewport(0, 0, fbo.width, fbo.height)
-			gl.glClear(gl.GL_COLOR_BUFFER_BIT)
-
-			gl.glMatrixMode(gl.GL_PROJECTION)
-			gl.glLoadIdentity()
-			gl.glOrtho(0,1,0,1,-1,1)
-			gl.glMatrixMode(gl.GL_MODELVIEW)
-			gl.glLoadIdentity()
-			
-			for _,args in ipairs{
-				{tex=lightPosTexs[2].id, shader=iterateLightPosShader},
-				{tex=lightVelTexs[2].id, shader=iterateLightVelShader},
-			} do
-			
-				fbo:bind()
-				gl.glFramebufferTexture2D(gl.GL_FRAMEBUFFER, gl.GL_COLOR_ATTACHMENT0, gl.GL_TEXTURE_2D, args.tex, 0)
-				assert(checkFBO())
-
-				args.shader:use()
-				lightPosTexs[1]:bind(0)
-				lightVelTexs[1]:bind(1)
-				gl.glBegin(gl.GL_QUADS)
-				for _,uv in ipairs(uvs) do
-					gl.glVertex2f(uv[1], uv[2])
-				end
-				gl.glEnd()
-				ShaderProgram:useNone()
-				fbo:unbind()
-			end
-			
-			-- swap
-			lightPosTexs[1], lightPosTexs[2] = lightPosTexs[2], lightPosTexs[1]
-			lightVelTexs[1], lightVelTexs[2] = lightVelTexs[2], lightVelTexs[1]
+	elseif event.type == sdl.SDL_MOUSEBUTTONDOWN then
+		if event.button.button == sdl.SDL_BUTTON_LEFT then
+			leftButtonDown = true
+		elseif event.button.button == sdl.SDL_BUTTON_WHEELUP then
+			tanFov = tanFov * zoomFactor
+			lightInitialized = false
+		elseif event.button.button == sdl.SDL_BUTTON_WHEELDOWN then
+			tanFov = tanFov / zoomFactor
+			lightInitialized = false
 		end
+	elseif event.type == sdl.SDL_MOUSEBUTTONUP then
+		if event.button.button == sdl.SDL_BUTTON_LEFT then
+			leftButtonDown = false
+		end
+	elseif event.type == sdl.SDL_KEYDOWN then
+		if event.key.keysym.sym == sdl.SDLK_i then
+			doIteration = 2
+		elseif event.key.keysym.sym == sdl.SDLK_j then
+			doIteration = 1
+		end
+	end
+end
+	
+function App:updateGUI()
+	ig.igText'testing testing'
+	ig.igInputFloat('delta lambda', deltaLambdaPtr)
+	ig.igInputInt('iterations', iterationsPtr)
+end
+	
+function App:update()
+	App.super.update(self)
+	
+	local viewWidth, viewHeight = self.width, self.height
+
+	viewRot:toAngleAxis(viewAngleAxis)
+	
+	-- init light if necessary
+	if not lightInitialized then
+		lightInitialized = true
+	
+		gl.glViewport(0, 0, fbo.width, fbo.height)
+		local aspectRatio = viewWidth / viewHeight
+
+		gl.glMatrixMode(gl.GL_PROJECTION)
+		gl.glLoadIdentity()
+		gl.glFrustum(-zNear * aspectRatio * tanFov, zNear * aspectRatio * tanFov, -zNear * tanFov, zNear * tanFov, zNear, zFar)
+		gl.glMatrixMode(gl.GL_MODELVIEW)
+		gl.glLoadIdentity()
+		gl.glRotatef(-viewAngleAxis[4], viewAngleAxis[1], viewAngleAxis[2], viewAngleAxis[3])
+					
+		for _,args in ipairs{
+			{tex=lightPosTexs[1].id, shader=initLightPosShader},
+			{tex=lightVelTexs[1].id, shader=initLightVelShader},
+		} do
+			fbo:draw{
+				dest = args.tex,
+				shader = args.shader,
+				callback = function()
+					gl.glBegin(gl.GL_QUADS)
+					for _,uv in ipairs(uvs) do
+						gl.glVertex3f((uv[1] - .5) * 2 * aspectRatio * tanFov,
+							(uv[2] - .5) * 2 * tanFov,
+							-1)
+					end
+					gl.glEnd()
+				end,
+			}
+		end
+	end
 
 
-
-		gl.glViewport(0,0,viewWidth, viewHeight)
+	
+	if doIteration ~= 0 then
+		if doIteration == 1 then doIteration = 0 end
+		--print('iterating...')
+		gl.glViewport(0, 0, fbo.width, fbo.height)
 		gl.glClear(gl.GL_COLOR_BUFFER_BIT)
 
 		gl.glMatrixMode(gl.GL_PROJECTION)
@@ -541,26 +498,56 @@ void main() {
 		gl.glOrtho(0,1,0,1,-1,1)
 		gl.glMatrixMode(gl.GL_MODELVIEW)
 		gl.glLoadIdentity()
-
-		drawLightShader:use()
-		lightPosTexs[1]:bind(0)
-		skyTex:bind(1)
-		gl.glBegin(gl.GL_QUADS)
-		for _,uv in ipairs(uvs) do
-			gl.glVertex2f(uv[1], uv[2])
-		end
-		gl.glEnd()
-		drawLightShader:useNone()
-
-		gl.glActiveTexture(gl.GL_TEXTURE0)
-		if tw then
-			tw.TwWindowSize(viewWidth, viewHeight)
-			tw.TwDraw()
+		
+		for _,args in ipairs{
+			{tex=lightPosTexs[2].id, shader=iterateLightPosShader},
+			{tex=lightVelTexs[2].id, shader=iterateLightVelShader},
+		} do
+			fbo:draw{
+				dest = args.tex,
+				shader = args.shader,
+				texs = {lightPosTexs[1], lightVelTexs[1]},
+				callback = function()
+					gl.glBegin(gl.GL_QUADS)
+					for _,uv in ipairs(uvs) do
+						gl.glVertex2f(uv[1], uv[2])
+					end
+					gl.glEnd()
+				end,
+			}
 		end
 		
-		glreport('update done')
-	end,
-	exit = function()
-		if tw then tw.TwTerminate() end
-	end,
-}
+		-- swap
+		lightPosTexs[1], lightPosTexs[2] = lightPosTexs[2], lightPosTexs[1]
+		lightVelTexs[1], lightVelTexs[2] = lightVelTexs[2], lightVelTexs[1]
+	end
+
+	gl.glViewport(0,0,viewWidth, viewHeight)
+	gl.glClear(gl.GL_COLOR_BUFFER_BIT)
+
+	gl.glMatrixMode(gl.GL_PROJECTION)
+	gl.glLoadIdentity()
+	gl.glOrtho(0,1,0,1,-1,1)
+	gl.glMatrixMode(gl.GL_MODELVIEW)
+	gl.glLoadIdentity()
+
+	drawLightShader:use()
+	lightPosTexs[1]:bind(0)
+	skyTex:bind(1)
+	gl.glBegin(gl.GL_QUADS)
+	for _,uv in ipairs(uvs) do
+		gl.glVertex2f(uv[1], uv[2])
+	end
+	gl.glEnd()
+	drawLightShader:useNone()
+
+	gl.glActiveTexture(gl.GL_TEXTURE0)
+	if tw then
+		tw.TwWindowSize(viewWidth, viewHeight)
+		tw.TwDraw()
+	end
+	
+	glreport('update done')
+end
+
+App():run()
