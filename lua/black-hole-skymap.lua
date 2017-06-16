@@ -59,11 +59,6 @@ local lightPosTexs = {}
 local lightVelTexs = {}
 local fbo
 
-local cosTex	-- map from 0,2pi to value
-local sinTex	-- map form 0,2pi to value
-local atanTex	-- map from -1,1 to value
-local sqrtTex	-- map from 0,100 to value
-
 -- notice that the order matches global 'sides'
 cubeFaces = {
 	{5,7,3,1};		-- <- each value has the x,y,z in the 0,1,2 bits (off = 0, on = 1)
@@ -85,9 +80,10 @@ local deltaLambdaPtr = ffi.new('float[1]', 1.)
 local iterationsPtr = ffi.new('int[1]', 1)
 
 local App = class(ImGuiApp)
+
 function App:initGL()
 	App.super.initGL(self)
-	
+
 	skyTex = GLTexCube{
 		filenames = {
 			'../skytex/sky-infrared-cube-xp.png',
@@ -223,21 +219,22 @@ void main() {
 		vertexCode = initLightShaderVertexCode,
 		fragmentCode = initLightShaderFragmentCode:gsub('$assign', 'gl_FragColor = relDiff;'),
 	}
-		
+	
 	local lightRes = 1024
 	for _,texs in ipairs{lightPosTexs, lightVelTexs} do
 		for i=1,2 do
 			texs[i] = GLTex2D{
 				width=lightRes,
 				height=lightRes,
-				type=gl.GL_RGBA,
 				format=gl.GL_RGBA,
+				type=gl.GL_FLOAT,
 				internalFormat=gl.GL_RGBA32F,
 				minFilter=gl.GL_NEAREST,
 				magFilter=gl.GL_NEAREST,
 			}
 		end
 	end
+
 	fbo = FBO{width=lightRes, height=lightRes}
 
 	local iterateLightShaderVertexCode = [[
@@ -454,20 +451,20 @@ function App:update()
 	-- init light if necessary
 	if not lightInitialized then
 		lightInitialized = true
-	
+		
 		gl.glViewport(0, 0, fbo.width, fbo.height)
 		local aspectRatio = viewWidth / viewHeight
-
+		
 		gl.glMatrixMode(gl.GL_PROJECTION)
 		gl.glLoadIdentity()
 		gl.glFrustum(-zNear * aspectRatio * tanFov, zNear * aspectRatio * tanFov, -zNear * tanFov, zNear * tanFov, zNear, zFar)
 		gl.glMatrixMode(gl.GL_MODELVIEW)
 		gl.glLoadIdentity()
 		gl.glRotatef(-viewAngleAxis[4], viewAngleAxis[1], viewAngleAxis[2], viewAngleAxis[3])
-					
+		
 		for _,args in ipairs{
-			{tex=lightPosTexs[1].id, shader=initLightPosShader},
-			{tex=lightVelTexs[1].id, shader=initLightVelShader},
+			{tex=lightPosTexs[1], shader=initLightPosShader},
+			{tex=lightVelTexs[1], shader=initLightVelShader},
 		} do
 			fbo:draw{
 				dest = args.tex,
