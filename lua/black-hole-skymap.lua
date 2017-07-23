@@ -26,6 +26,8 @@ conn^phi_theta_theta = -sin(phi) cos(phi)
 
 require 'ext'
 local ImGuiApp = require 'imguiapp'
+local View = require 'glapp.view'
+local Orbit = require 'glapp.orbit'
 local bit = require 'bit'
 local ffi = require 'ffi'
 local gl = require 'gl'
@@ -42,12 +44,12 @@ local FBO = require 'gl.fbo'
 local glreport = require 'gl.report'
 
 local skyTex
-local viewRot = Quat(0,math.sqrt(.5),0,math.sqrt(.5))*Quat(math.sqrt(.5),0,0,-math.sqrt(.5))
-local viewAngleAxis = Quat()
-local zNear = .1
-local zFar = 100
-local tanFov = 1
-local zoomFactor = .9
+--local viewRot = Quat(0,math.sqrt(.5),0,math.sqrt(.5))*Quat(math.sqrt(.5),0,0,-math.sqrt(.5))
+--local viewAngleAxis = Quat()
+--local zNear = .1
+--local zFar = 100
+--local tanFov = 1
+--local zoomFactor = .9
 local leftButtonDown
 
 local doIteration = 2
@@ -79,10 +81,17 @@ local uvs = {
 local deltaLambdaPtr = ffi.new('float[1]', 1.)
 local iterationsPtr = ffi.new('int[1]', 1)
 
-local App = class(ImGuiApp)
+local App = class(Orbit(View.apply(ImGuiApp)))
+
+App.title = 'black hole raytracer'
+App.viewDist = .001
 
 function App:initGL()
 	App.super.initGL(self)
+
+	self.view.angle = 
+		Quat(-math.sqrt(.5), 0, 0, -math.sqrt(.5))
+		* Quat(0, -math.sqrt(.5), 0, math.sqrt(.5))
 
 	skyTex = GLTexCube{
 		filenames = {
@@ -420,28 +429,32 @@ void main() {
 	
 	gl.glClearColor(.3, .3, .3, 1)		
 end
-	
+
 function App:event(event, eventPtr)
-	App.super.event(self, event, eventPtr)
+--	App.super.event(self, event, eventPtr)
 	if event.type == sdl.SDL_MOUSEMOTION then
 		if leftButtonDown then
+			-- [[
 			local idx = event.motion.xrel
 			local idy = event.motion.yrel
 			local magn = math.sqrt(idx * idx + idy * idy)
 			local dx = idx / magn
 			local dy = idy / magn
 			local r = Quat():fromAngleAxis(dy, dx, 0, -magn)
-			viewRot = (r * viewRot):normalize()
+			self.view.angle = self.view.angle:conjugate()
+			self.view.angle = (r * self.view.angle):normalize()
+			self.view.angle = self.view.angle:conjugate()
+			--]]
 			lightInitialized = false
 		end
 	elseif event.type == sdl.SDL_MOUSEBUTTONDOWN then
 		if event.button.button == sdl.SDL_BUTTON_LEFT then
 			leftButtonDown = true
 		elseif event.button.button == sdl.SDL_BUTTON_WHEELUP then
-			tanFov = tanFov * zoomFactor
+			--tanFov = tanFov * zoomFactor
 			lightInitialized = false
 		elseif event.button.button == sdl.SDL_BUTTON_WHEELDOWN then
-			tanFov = tanFov / zoomFactor
+			--tanFov = tanFov / zoomFactor
 			lightInitialized = false
 		end
 	elseif event.type == sdl.SDL_MOUSEBUTTONUP then
@@ -467,23 +480,21 @@ function App:update()
 	App.super.update(self)
 	
 	local viewWidth, viewHeight = self.width, self.height
-
-	viewRot:toAngleAxis(viewAngleAxis)
+	local aspectRatio = viewWidth / viewHeight
 	
 	-- init light if necessary
 	if not lightInitialized then
 		lightInitialized = true
 		
 		gl.glViewport(0, 0, fbo.width, fbo.height)
-		local aspectRatio = viewWidth / viewHeight
-		
-		gl.glMatrixMode(gl.GL_PROJECTION)
-		gl.glLoadIdentity()
-		gl.glFrustum(-zNear * aspectRatio * tanFov, zNear * aspectRatio * tanFov, -zNear * tanFov, zNear * tanFov, zNear, zFar)
-		gl.glMatrixMode(gl.GL_MODELVIEW)
-		gl.glLoadIdentity()
-		gl.glRotatef(-viewAngleAxis[4], viewAngleAxis[1], viewAngleAxis[2], viewAngleAxis[3])
-		
+
+		local view = self.view
+		local tanFovY = math.tan(view.fovY / 2)
+		local tanFovX = aspectRatio * tanFovY
+		self.view.angle = self.view.angle:conjugate()
+		view:setup(aspectRatio)
+		self.view.angle = self.view.angle:conjugate()
+
 		for _,args in ipairs{
 			{tex=lightPosTexs[1], shader=initLightPosShader},
 			{tex=lightVelTexs[1], shader=initLightVelShader},
@@ -494,8 +505,8 @@ function App:update()
 				callback = function()
 					gl.glBegin(gl.GL_QUADS)
 					for _,uv in ipairs(uvs) do
-						gl.glVertex3f((uv[1] - .5) * 2 * aspectRatio * tanFov,
-							(uv[2] - .5) * 2 * tanFov,
+						gl.glVertex3f((uv[1] - .5) * 2 * tanFovX, 
+							(uv[2] - .5) * 2 * tanFovY,
 							-1)
 					end
 					gl.glEnd()
@@ -504,8 +515,6 @@ function App:update()
 		end
 	end
 
-
-	
 	if doIteration ~= 0 then
 		if doIteration == 1 then doIteration = 0 end
 		--print('iterating...')
@@ -561,11 +570,23 @@ function App:update()
 	drawLightShader:useNone()
 
 	gl.glActiveTexture(gl.GL_TEXTURE0)
-	if tw then
-		tw.TwWindowSize(viewWidth, viewHeight)
-		tw.TwDraw()
+
+	-- [[
+	self.view:setup(aspectRatio)
+	gl.glPolygonMode(gl.GL_FRONT_AND_BACK, gl.GL_LINE)
+	gl.glBegin(gl.GL_QUADS)
+	for _,face in ipairs(cubeFaces) do
+		for _,i in ipairs(face) do
+			local x = bit.band(i, 1)
+			local y = bit.band(bit.rshift(i, 1), 1)
+			local z = bit.band(bit.rshift(i, 2), 1)
+			gl.glVertex3d(x*2-1,y*2-1,z*2-1)
+		end
 	end
-	
+	gl.glEnd()
+	gl.glPolygonMode(gl.GL_FRONT_AND_BACK, gl.GL_FILL)
+	--]]
+
 	glreport('update done')
 end
 
