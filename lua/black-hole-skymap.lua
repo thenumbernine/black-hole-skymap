@@ -84,7 +84,7 @@ local iterationsPtr = ffi.new('int[1]', 1)
 local App = class(Orbit(View.apply(ImGuiApp)))
 
 App.title = 'black hole raytracer'
-App.viewDist = .001
+App.viewDist = 20
 
 function App:initGL()
 	App.super.initGL(self)
@@ -194,7 +194,19 @@ float sechSq(float x) {
 	local initLightShaderVertexCode = shaderDefs .. [[
 varying vec3 pos;			
 void main() {
-	vec4 mvpos = gl_ModelViewMatrix * gl_Vertex;
+	//vec4 mvpos = gl_ModelViewMatrix * gl_Vertex;
+
+	vec4 mvpos;
+	mvpos.xyz = gl_ModelViewMatrix[3].xyz + vec3( 
+		dot(gl_ModelViewMatrix[0].xyz, gl_Vertex.xyz), 
+		dot(gl_ModelViewMatrix[1].xyz, gl_Vertex.xyz),
+		dot(gl_ModelViewMatrix[2].xyz, gl_Vertex.xyz));
+	//mvpos.xyz = gl_ModelViewMatrix[3].xyz + 
+	//	gl_ModelViewMatrix[0].xyz * gl_Vertex.x
+	//	+ gl_ModelViewMatrix[1].xyz * gl_Vertex.y
+	//	+ gl_ModelViewMatrix[2].xyz * gl_Vertex.z;
+	mvpos.w = gl_Vertex.w;
+
 	pos = normalize(mvpos.xyz);
 	gl_Position = gl_ProjectionMatrix * gl_Vertex;
 }
@@ -479,6 +491,7 @@ end
 function App:update()
 	App.super.update(self)
 	
+	local view = self.view
 	local viewWidth, viewHeight = self.width, self.height
 	local aspectRatio = viewWidth / viewHeight
 	
@@ -488,12 +501,12 @@ function App:update()
 		
 		gl.glViewport(0, 0, fbo.width, fbo.height)
 
-		local view = self.view
 		local tanFovY = math.tan(view.fovY / 2)
 		local tanFovX = aspectRatio * tanFovY
-		self.view.angle = self.view.angle:conjugate()
-		view:setup(aspectRatio)
-		self.view.angle = self.view.angle:conjugate()
+local oldpos = view.pos
+view.pos = vec3(0,0,0)
+view:setup(aspectRatio)
+view.pos = oldpos
 
 		for _,args in ipairs{
 			{tex=lightPosTexs[1], shader=initLightPosShader},
@@ -572,7 +585,11 @@ function App:update()
 	gl.glActiveTexture(gl.GL_TEXTURE0)
 
 	-- [[
-	self.view:setup(aspectRatio)
+	local oldpos = view.pos
+	view.pos = vec3(0,0,0)
+	view:setup(aspectRatio)
+	view.pos = oldpos
+	
 	gl.glPolygonMode(gl.GL_FRONT_AND_BACK, gl.GL_LINE)
 	gl.glBegin(gl.GL_QUADS)
 	for _,face in ipairs(cubeFaces) do
