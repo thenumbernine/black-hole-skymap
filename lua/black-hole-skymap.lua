@@ -107,8 +107,17 @@ function App:initGL()
 #define M_PI 3.14159265358979311599796346854418516159057617187500
 #define ITERATIONS 1
 
-#define SCHWARZSCHILD_SPHERIC
+#define SCHWARZSCHILD_CARTESIAN
+//#define SCHWARZSCHILD_SPHERIC
 //#define ALCUBIERRE
+
+#ifdef SCHWARZSCHILD_CARTESIAN
+#define EVENT_HORIZON_RADIUS	1.
+#define COORDINATE_CENTER	vec3(20., 0., 0.);	//working but not without some numerical instabilities
+#define TO_COORDINATES(v)	(v)
+#define FROM_COORDINATES(v)	(v)
+
+#endif
 
 #ifdef SCHWARZSCHILD_SPHERIC
 #define EVENT_HORIZON_RADIUS	1.
@@ -259,7 +268,20 @@ void main() {
 	for (int i = 0; i < ITERATIONS; i++) {
 		//-x''^a = conn^a_bc x'^b x'^c
 		vec4 negRelDiff2;
-		
+	
+#ifdef SCHWARZSCHILD_CARTESIAN
+		float r = length(rel.xyz);
+		float posDotVel = dot(rel.xyz, relDiff.xyz);
+		float posDotVelSq = posDotVel * posDotVel;
+		float relDiffSq = dot(relDiff.xyz, relDiff.xyz);
+		float R = EVENT_HORIZON_RADIUS;
+		float rSq = r * r;
+		float relDiffTSq = relDiff.w * relDiff.w;
+		float scale = (R / (r * rSq)) * (.5 * relDiffTSq * (1. - R / r) + relDiffSq - .5 * posDotVelSq * (3. * r - 2. * R) / (rSq * (r - R)));
+		negRelDiff2.xyz = rel.xyz * scale;
+		negRelDiff2.w = R / (rSq * (r - R)) * posDotVel * relDiff.w;
+#endif
+
 #ifdef SCHWARZSCHILD_SPHERIC
 		rel.y = mod(rel.y, 2. * M_PI);
 		rel.z = mod(rel.z, 2. * M_PI);
