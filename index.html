@@ -21,7 +21,7 @@
 		<script type='text/javascript' src='renderer.fbo.js'></script>
 		<script type='text/javascript' src='main.js'></script>
 		
-<script type='text/javascript'>
+<!-- script type='text/javascript'>
 var _gaq = _gaq || [];
 _gaq.push(['_setAccount', 'UA-17312646-1']);
 _gaq.push(['_trackPageview']);
@@ -30,7 +30,7 @@ _gaq.push(['_trackPageview']);
 	ga.src = ('https:' == document.location.protocol ? 'https://ssl' : 'http://www') + '.google-analytics.com/ga.js';
 	var s = document.getElementsByTagName('script')[0]; s.parentNode.insertBefore(ga, s);
 })();
-</script>
+</script -->
 
 	</head>
 	<body style='margin:0px; overflow:hidden; background-color:black; color:white'>
@@ -148,8 +148,7 @@ _gaq.push(['_trackPageview']);
 			The metric is given in pseudo-Cartesian form as \( {ds}^2 = -(1 - {2 M \over r}) {dt}^2 + (1 - \frac{2 M}{r} )^{-1} (dx^2 + dy^2 + dz^2) + \frac{4 M}{r^2 (r - 2 M)} (x y dx dy + x z dx dz + y z dy dz) \)
 			for M the mass of the object.<br>
 			<a href='http://spiro.fisica.unipd.it/~antonell/schwarzschild/'>This guy</a> was kind enough to reference this page and publicise the previous math error I had here (I had forgot the cross terms).
-			If only he was kind enough to attempt to contact me in private first.
-			Rest assured, dear viewers, that the renderer implementation's geodesic calculations were based on the correct pseudo-Cartesian metric.
+			If only he was kind enough to attempt to contact me in private first, I could have reminded him that the renderer implementation's geodesic calculations were based on the correct pseudo-Cartesian metric all along.
 			Here's my <a href='/symbolic-lua/test-output/Schwarzschild%20-%20Cartesian.html'>geodesic calculations</a>.<br>
 			<h3>Kerr Geodesic</h3>
 			The Kerr metric describes the curvature of spacetime around a spherical rotating object.
