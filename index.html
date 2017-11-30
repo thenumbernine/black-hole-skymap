@@ -1,21 +1,21 @@
-<!DOCTYPE html>
+<!doctype html>
 <html>
 	<head>
-		<meta charset="UTF-8">
+		<meta charset='utf-8'>
 		<title>Black Hole Iterative Skymap - WebGL</title>
-		<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-		<meta name="apple-mobile-web-app-capable" content="yes"/>
-		<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+		<meta name='viewport' content='width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no'>
+		<meta name='apple-mobile-web-app-capable' content='yes'/>
+		<meta name='apple-mobile-web-app-status-bar-style' content='black-translucent'/>
 
 		<script type='text/javascript' src='/js/jquery-1.11.1.min.js'></script>
-		<script type="text/javascript" src="/js/purl.js"></script>
+		<script type='text/javascript' src='/js/purl.js'></script>
 		<script type='text/javascript' src='/js/util.js'></script>
 		<script type='text/javascript' src='/js/gl-matrix.2.2.0.min.js'></script>
 		<script type='text/javascript' src='/js/gl-util.js'></script>
 		<script type='text/javascript' src='/js/gl-util-unitquad.js'></script>
 		<script type='text/javascript' src='/js/gl-util-kernel.js'></script>
 		<script type='text/javascript' src='/js/mouse3d.js'></script>
-		<script type="text/javascript" src="/MathJax/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
+		<script type='text/javascript' src='/MathJax/MathJax.js?config=TeX-AMS-MML_HTMLorMML'></script>
 		<script type='text/javascript' src='renderer.testcube.js'></script>
 		<script type='text/javascript' src='renderer.sw.js'></script>
 		<script type='text/javascript' src='renderer.fbo.js'></script>
@@ -145,8 +145,12 @@ _gaq.push(['_trackPageview']);
 \).
 			<h3>Schwarzschild Geodesic</h3>
 			The Schwarzschild metric describes the curvature of spacetime around a spherical object.
-			The metric is given as \( {ds}^2 = -(1 - {2 M \over r}) {dt}^2 + (1 - {2 M \over r})^{-1} ({dx}^2 + {dy}^2 + {dz}^2) \)
+			The metric is given in pseudo-Cartesian form as \( {ds}^2 = -(1 - {2 M \over r}) {dt}^2 + (1 - \frac{2 M}{r} )^{-1} (dx^2 + dy^2 + dz^2) + \frac{4 M}{r^2 (r - 2 M)} (x y dx dy + x z dx dz + y z dy dz) \)
 			for M the mass of the object.<br>
+			<a href='http://spiro.fisica.unipd.it/~antonell/schwarzschild/'>This guy</a> was kind enough to reference this page and publicise the previous math error I had here (I had forgot the cross terms).
+			If only he was kind enough to attempt to contact me in private first.
+			Rest assured, dear viewers, that the renderer implementation's geodesic calculations were based on the correct pseudo-Cartesian metric.
+			Here's my <a href='/symbolic-lua/test-output/Schwarzschild%20-%20Cartesian.html'>geodesic calculations</a>.<br>
 			<h3>Kerr Geodesic</h3>
 			The Kerr metric describes the curvature of spacetime around a spherical rotating object.
 			The metric is given as \( {ds}^2 = -{dt}^2 + {dx}^2 + {dy}^2 + {dz}^2 + {2mr^3 \over {r^4 + a^2 z^2}} (dt + {{rx+ay}\over{a^2+r^2}} dx + {{ry-ax}\over{a^2+r^2}} dy + {z \over r} dz)^2 \)

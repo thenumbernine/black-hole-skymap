@@ -191,38 +191,33 @@ float sechSq(float x) {
 
 ]]
 
+--[[
+inverse camera parameters:
+[R^-1 0] [1 -T]   [R^-1, -R^-1 T]
+[0    1] [0  1] = [   0,    1   ]
+--]]
 	local initLightShaderVertexCode = shaderDefs .. [[
-varying vec3 pos;			
+varying vec3 eyePos;
+varying vec3 vtxPos;
 void main() {
-	//vec4 mvpos = gl_ModelViewMatrix * gl_Vertex;
+	mat3 rot = transpose(mat3(
+		gl_ModelViewMatrix[0].xyz,
+		gl_ModelViewMatrix[1].xyz,
+		gl_ModelViewMatrix[2].xyz));
+	vec3 eyePos = -rot * gl_ModelViewMatrix[3].xyz;
+	vec3 vtxPos = rot * gl_Vertex.xyz + eyePos;
 
-	vec4 mvpos;
-	mvpos.xyz = gl_ModelViewMatrix[3].xyz + vec3( 
-		dot(gl_ModelViewMatrix[0].xyz, gl_Vertex.xyz), 
-		dot(gl_ModelViewMatrix[1].xyz, gl_Vertex.xyz),
-		dot(gl_ModelViewMatrix[2].xyz, gl_Vertex.xyz));
-	//mvpos.xyz = gl_ModelViewMatrix[3].xyz + 
-	//	gl_ModelViewMatrix[0].xyz * gl_Vertex.x
-	//	+ gl_ModelViewMatrix[1].xyz * gl_Vertex.y
-	//	+ gl_ModelViewMatrix[2].xyz * gl_Vertex.z;
-	mvpos.w = gl_Vertex.w;
-
-	pos = normalize(mvpos.xyz);
 	gl_Position = gl_ProjectionMatrix * gl_Vertex;
 }
 ]]
 
 	local initLightShaderFragmentCode = shaderDefs .. [[
-varying vec3 pos;
+varying vec3 eyePos;
+varying vec3 vtxPos;
 
 void main() {
-	//"null geodesic" means that the time component squared is equal to the space component squared
-	vec4 relDirEnd = vec4(normalize(pos), 1.);
-	vec4 rel = vec4(0., 0., 0., 0.);
-
-	//center coordinates at the stellar body center
-	rel.xyz -= COORDINATE_CENTER;
-	relDirEnd.xyz -= COORDINATE_CENTER;
+	vec4 rel = vec4(eyePos, 1.); 
+	vec4 relDirEnd = vec4(vtxPos - eyePos, 1.);
 
 	//convert to spherical coordinates for iteration
 	rel = TO_COORDINATES(rel);
@@ -397,7 +392,7 @@ you could do the iteration in the shader loop, or you could use a fbo to store s
 varying vec2 tc;
 void main() {
 	tc = gl_Vertex.xy;
-	gl_Position = ftransform();
+	gl_Position = gl_ProjectionMatrix * gl_Vertex;
 }
 ]],
 		fragmentCode = shaderDefs .. [[
@@ -419,7 +414,12 @@ void main() {
 		vec3 result = FROM_COORDINATES(rel).xyz;
 		
 		//convert from black-hole-centered to view-centered
-		result += COORDINATE_CENTER;
+		//result += gl_ModelViewMatrix[3].xyz;
+		result += COORDINATE_CENTER; 
+		//result += vec3(
+		//	dot(gl_ModelViewMatrix[0].xyz, gl_ModelViewMatrix[3].xyz),
+		//	dot(gl_ModelViewMatrix[1].xyz, gl_ModelViewMatrix[3].xyz),
+		//	dot(gl_ModelViewMatrix[2].xyz, gl_ModelViewMatrix[3].xyz));
 		
 		//with distortion
 		gl_FragColor = textureCube(cubeTex, result);
@@ -443,30 +443,17 @@ void main() {
 end
 
 function App:event(event, eventPtr)
---	App.super.event(self, event, eventPtr)
+	App.super.event(self, event, eventPtr)
 	if event.type == sdl.SDL_MOUSEMOTION then
 		if leftButtonDown then
-			-- [[
-			local idx = event.motion.xrel
-			local idy = event.motion.yrel
-			local magn = math.sqrt(idx * idx + idy * idy)
-			local dx = idx / magn
-			local dy = idy / magn
-			local r = Quat():fromAngleAxis(dy, dx, 0, -magn)
-			self.view.angle = self.view.angle:conjugate()
-			self.view.angle = (r * self.view.angle):normalize()
-			self.view.angle = self.view.angle:conjugate()
-			--]]
 			lightInitialized = false
 		end
 	elseif event.type == sdl.SDL_MOUSEBUTTONDOWN then
 		if event.button.button == sdl.SDL_BUTTON_LEFT then
 			leftButtonDown = true
 		elseif event.button.button == sdl.SDL_BUTTON_WHEELUP then
-			--tanFov = tanFov * zoomFactor
 			lightInitialized = false
 		elseif event.button.button == sdl.SDL_BUTTON_WHEELDOWN then
-			--tanFov = tanFov / zoomFactor
 			lightInitialized = false
 		end
 	elseif event.type == sdl.SDL_MOUSEBUTTONUP then
@@ -570,7 +557,9 @@ view.pos = oldpos
 	gl.glLoadIdentity()
 	gl.glOrtho(0,1,0,1,-1,1)
 	gl.glMatrixMode(gl.GL_MODELVIEW)
-	gl.glLoadIdentity()
+	view:setupModelView()
+	--gl.glLoadIdentity()
+	--gl.glTranslatef(20, 0, 0)
 
 	drawLightShader:use()
 	lightPosTexs[1]:bind(0)
@@ -582,22 +571,22 @@ view.pos = oldpos
 	gl.glEnd()
 	drawLightShader:useNone()
 
+	gl.glLoadIdentity()
 	gl.glActiveTexture(gl.GL_TEXTURE0)
 
 	-- [[
 	local oldpos = view.pos
-	view.pos = vec3(0,0,0)
 	view:setup(aspectRatio)
-	view.pos = oldpos
 	
 	gl.glPolygonMode(gl.GL_FRONT_AND_BACK, gl.GL_LINE)
 	gl.glBegin(gl.GL_QUADS)
+	local s = 1
 	for _,face in ipairs(cubeFaces) do
 		for _,i in ipairs(face) do
 			local x = bit.band(i, 1)
 			local y = bit.band(bit.rshift(i, 1), 1)
 			local z = bit.band(bit.rshift(i, 2), 1)
-			gl.glVertex3d(x*2-1,y*2-1,z*2-1)
+			gl.glVertex3d(s*(x*2-1),s*(y*2-1),s*(z*2-1))
 		end
 	end
 	gl.glEnd()
