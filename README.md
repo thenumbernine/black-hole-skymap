@@ -1,4 +1,9 @@
-black hole raytrace simulator
+A NOTE ABOUT ANYONE FOLLOWING THE LINK FROM http://spiro.fisica.unipd.it/~antonell/schwarzschild/
+This guy was kind enough to reference this page and publicise the previous math error I had here (I had forgot the cross terms). If only he was kind enough to attempt to contact me in private first, I could have reminded him that the renderer implementation's geodesic calculations were based on the correct pseudo-Cartesian metric all along. Here's where I got the metric from:  [https://arxiv.org/abs/0904.4184](Catalogue of Spacetimes) by Mueller & Grave. Here's my [http://christopheremoore.net/symbolic-lua/test-output/Schwarzschild%20-%20Cartesian.html](geodesic calculations) based on my [http://christopheremoore.net/symbolic-lua](Computer Algebra System) in Lua.
+
+
+
+## black hole raytrace simulator
 
 http://christopheremoore.net/black-hole-skymap/
 
@@ -11,7 +16,6 @@ schwarzschild metric
 
 Alcubierre warp drive bubble was already provided in Cartesian.  Way to go ADM formalism!
 https://en.wikipedia.org/wiki/Alcubierre_drive
-
 
 The first version of this I wrote as a luajit script.  It works with Malkia's UFO plus some
 auxiliary lua libraries I have yet to post.  Find it in the lua/ folder.
