@@ -1,7 +1,8 @@
 # A NOTE ABOUT ANYONE FOLLOWING THE LINK FROM http://spiro.fisica.unipd.it/~antonell/schwarzschild/
 
-This guy was kind enough to reference this page and publicise the previous math error I had here (I had forgot the cross terms). If only he was kind enough to attempt to contact me in private first, I could have reminded him that the renderer implementation's geodesic calculations were based on the correct pseudo-Cartesian metric all along. Here's where I got the metric from:  [Catalogue of Spacetimes](https://arxiv.org/abs/0904.4184) by Mueller & Grave. Here's my [geodesic calculations](http://christopheremoore.net/symbolic-lua/test-output/Schwarzschild%20-%20Cartesian.html) based on my [Computer Algebra System](http://christopheremoore.net/symbolic-lua) in Lua.
+This guy was kind enough to reference this page and publicise a previous math error I had made (I had forgot the cross terms in the Cartesian form of the Schwarzschild metric). If only he was kind enough to attempt to contact me in private first, I could have reminded him that the renderer implementation's geodesic calculations were based on the correct pseudo-Cartesian metric all along. Here's where I got the metric from:  [Catalogue of Spacetimes](https://arxiv.org/abs/0904.4184) by Mueller & Grave. Here's my [geodesic calculations](http://christopheremoore.net/symbolic-lua/test-output/Schwarzschild%20-%20Cartesian.html) based on my [Computer Algebra System](http://christopheremoore.net/symbolic-lua) in Lua.
 
+For what it's worth, as long as he's doing his calculations in spherical coordinates, he is going to run into numerical errors at the poles -- which he probably won't overcome until he makes the switch to pseudo-Cartesian as well.  This is probably why his orbiting view is fixed to the equatorial plane.
 
 
 ## black hole raytrace simulator
