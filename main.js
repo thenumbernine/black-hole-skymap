@@ -7,8 +7,8 @@ var objectTypes = ['Black Hole', 'Alcubierre Warp Drive Bubble'];
 var objectType = objectTypes[0];
 var objectDist = 10;
 var blackHoleMass = .1;
-var warpBubbleThickness = 1;
-var warpBubbleVelocity = .5;
+var warpBubbleThickness = .05;
+var warpBubbleVelocity = 2;
 var warpBubbleRadius = 2;
 var deltaLambda = .1;	//ray forward iteration
 
@@ -47,10 +47,11 @@ float sechSq(float x) {
 */});
 
 function stupidPrint(s) {
-	return;
+/*
 	$.each(s.split('\n'), function(_,l) {
 		console.log(l);
 	});
+*/
 }
 
 var SQRT_1_2 = Math.sqrt(.5);
@@ -287,4 +288,3 @@ function main1() {
 }
 
 $(document).ready(main1);
-
