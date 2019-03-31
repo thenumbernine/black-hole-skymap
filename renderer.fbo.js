@@ -250,38 +250,48 @@ uniform float warpBubbleRadius;
 uniform float warpBubbleVelocity;
 
 vec4 accel(vec4 pos, vec4 vel) {
-	float rs = length(pos.xyz);
-	float sigmaFront = warpBubbleThickness * (rs + warpBubbleRadius);
+	float r = length(pos.xyz);
+	float sigmaFront = warpBubbleThickness * (r + warpBubbleRadius);
 	float sigmaCenter = warpBubbleThickness * warpBubbleRadius;
-	float sigmaBack = warpBubbleThickness * (rs - warpBubbleRadius);
+	float sigmaBack = warpBubbleThickness * (r - warpBubbleRadius);
 	float tanhSigmaCenter = tanh(sigmaCenter);
 	float f = (tanh(sigmaFront) - tanh(sigmaBack)) / (2. * tanhSigmaCenter);
 	float sechDiff = sechSq(sigmaFront) - sechSq(sigmaBack);
-	float dfScalar = sechDiff / (2. * rs * tanhSigmaCenter);
-	vec4 fv;
-	fv.xyz = warpBubbleThickness * pos.xyz * dfScalar;
-	fv.w = -warpBubbleVelocity * warpBubbleThickness * pos.x * dfScalar;
+	float dfScalar = sechDiff / (2. * r * tanhSigmaCenter);
+	vec4 df;
+	df.xyz = warpBubbleThickness * pos.xyz * dfScalar;
+	df.w = -warpBubbleVelocity * warpBubbleThickness * pos.x * dfScalar;
+
+	float u = f * warpBubbleVelocity;
+	vec4 du = df * warpBubbleVelocity;
+	
 	vec4 result;
-	result.w = -(f * f * fv.x * warpBubbleVelocity * warpBubbleVelocity * warpBubbleVelocity * vel.w * vel.w
-		- 2. * f * fv.x * warpBubbleVelocity * warpBubbleVelocity * vel.w * vel.x
-		- 2. * f * fv.y * warpBubbleVelocity * warpBubbleVelocity / 2. * vel.w * vel.y
-		- 2. * f * fv.z * warpBubbleVelocity * warpBubbleVelocity / 2. * vel.w * vel.z
-		+ fv.x * warpBubbleVelocity * vel.x * vel.x
-		+ 2. * fv.y * warpBubbleVelocity / 2. * vel.x * vel.y
-		+ 2. * fv.z * warpBubbleVelocity / 2. * vel.x * vel.z
-	);
-	result.x = -((f * f * f * fv.x * warpBubbleVelocity * warpBubbleVelocity * warpBubbleVelocity * warpBubbleVelocity - f * fv.x * warpBubbleVelocity * warpBubbleVelocity - fv.w * warpBubbleVelocity) * vel.w * vel.w
-		- 2. * f * f * fv.x * warpBubbleVelocity * warpBubbleVelocity * warpBubbleVelocity * vel.w * vel.x
-		- 2. * (f * f * fv.y * warpBubbleVelocity * warpBubbleVelocity * warpBubbleVelocity + fv.y * warpBubbleVelocity) / 2. * vel.w * vel.y
-		- 2. * (f * f * fv.z * warpBubbleVelocity * warpBubbleVelocity * warpBubbleVelocity + fv.z * warpBubbleVelocity) / 2. * vel.w * vel.z
-		+ f * fv.x * warpBubbleVelocity * warpBubbleVelocity * vel.x * vel.x
-		+ 2. * f * fv.y * warpBubbleVelocity * warpBubbleVelocity / 2. * vel.x * vel.y
-		+ 2. * f * fv.z * warpBubbleVelocity * warpBubbleVelocity / 2. * vel.x * vel.z
-	);
-	result.y = f * fv.y * warpBubbleVelocity * warpBubbleVelocity * vel.w * vel.w
-		+ 2. * fv.y * warpBubbleVelocity / 2. * vel.w * vel.x;
-	result.z = f * fv.z * warpBubbleVelocity * warpBubbleVelocity * vel.w * vel.w
-		+ 2. * fv.z * warpBubbleVelocity / 2. * vel.w * vel.x;
+	result.w = 
+		- du.x * vel.x * vel.x
+		- du.y * vel.x * vel.y
+		- du.z * vel.x * vel.z
+		
+		+ 2. * du.x * vel.w * vel.x * u
+		- du.x * vel.w * vel.w * u * u
+		+ du.y * vel.w * vel.y * u
+		+ du.z * vel.w * vel.z * u
+	;
+	
+	result.x = 
+		du.w * vel.w * vel.w
+		+ du.y * vel.w * vel.y
+		+ du.y * vel.w * vel.y * u * u
+		- du.y * vel.x * vel.y * u
+		+ du.z * vel.w * vel.z
+		+ du.z * vel.w * vel.z * u * u
+		- du.z * vel.x * vel.z * u
+		+ du.x * vel.w * vel.w * u
+		- du.x * vel.w * vel.w * u * u * u
+		+ 2. * du.x * vel.w * vel.x * u * u
+		- du.x * vel.x * vel.x * u
+	;
+	result.y = -du.y * vel.w * (vel.x - vel.w * u);
+	result.z = -du.z * vel.w * (vel.x - vel.w * u);
 	return result;
 }
 */}));
