@@ -83,47 +83,45 @@ void main() {
 	gl_Position = vec4(vertex * 2. - 1., 0., 1.);
 }
 */}));
-						
-						if (pos_or_vel == 'pos') {
-							if (objType == 'Black Hole') {
-								fsh.push(mlstr(function(){/*
-varying vec3 vtxv;
+							fsh.push(mlstr(function(){/*
 uniform float objectDist;
+*/}));
+						if (pos_or_vel == 'pos') {
+							fsh.push(mlstr(function(){/*
+varying vec3 vtxv;
 void main() {
 	gl_FragColor = vec4(0.);
 	gl_FragColor.x -= objectDist;
 }
 */}));
-							} else if (objType == 'Alcubierre Warp Drive Bubble') {
-								fsh.push(mlstr(function(){/*
-varying vec3 vtxv;
-void main() {
-	gl_FragColor = vec4(0.);
-}
-*/}));
-							}	
 						} else if (pos_or_vel == 'vel') {
-								
-							fsh.push(mlstr(function(){/*
-uniform float objectDist;
-*/}));	
 							if (objType == 'Black Hole') {
 								fsh.push(mlstr(function(){/*
 uniform float blackHoleMass;
 
-float reset_w(vec3 vel) {
-//when initializing our metric:
-//g_ab v^a v^b = 0 for our metric g
-// (-1 + 2M/r) vt^2 + v^i v^j (delta_ij + x^i x^j 2M / (r^2 (r - 2M)))
-// -(r - 2M)/r vt^2 + (|v|^2 + (v dot x)^2 2M / (r^2 (r - 2M)) )
-// vt^2 = (|v|^2 + (v dot x)^2 2M / (r^2 (r - 2M)) ) r/(r - 2M)
-	float vSq = dot(vel, vel);
-	vec3 pos = vec3(-objectDist, 0., 0.);
+// g_tt = -(1 - m/(2r))^2 / (1 + m/(2r))^2
+float g_tt(vec3 pos, vec3 vel) {
 	float r = length(pos);
-	float rSq = r * r;
-	float vDotX = dot(vel, pos);
-	float R = 2. * blackHoleMass;
-	return (vSq + vDotX * vDotX * R / (rSq * (r - R))) * r / (r - R);
+	float _m_2r = blackHoleMass / (2. * r);
+	float _1_plus_m_2r = 1. + _m_2r;
+	float _1_minus_m_2r = 1. - _m_2r;
+	float ratio = _1_minus_m_2r / _1_plus_m_2r;
+	return -ratio * ratio; 
+}
+
+// g_ti = 0
+vec3 g_ti(vec3 pos, vec3 vel) { 
+	return vec3(0., 0., 0.); 
+}
+
+// g_ij = delta_ij (1 + m/(2r))^4 
+mat3 g_ij(vec3 pos, vec3 vel) {
+	float r = length(pos);
+	float _m_2r = blackHoleMass / (2. * r);
+	float _1_plus_m_2r = 1. + _m_2r;
+	float _1_plus_m_2r_sq = _1_plus_m_2r * _1_plus_m_2r;
+	float _1_plus_m_2r_toTheFourth = _1_plus_m_2r_sq * _1_plus_m_2r_sq;
+	return mat3(_1_plus_m_2r_toTheFourth);
 }
 
 */}));						
@@ -133,32 +131,62 @@ uniform float warpBubbleThickness;
 uniform float warpBubbleVelocity;
 uniform float warpBubbleRadius;
 
-float reset_w(vec3 vel) {
-	vec3 pos = vec3(-objectDist, 0., 0.);
+float Alcubierre_f(vec3 pos) {
 	float rs = length(pos);
 	float sigmaFront = warpBubbleThickness * (rs + warpBubbleRadius);
 	float sigmaCenter = warpBubbleThickness * warpBubbleRadius;
 	float sigmaBack = warpBubbleThickness * (rs - warpBubbleRadius);
 	float tanhSigmaCenter = tanh(sigmaCenter);
 	float f = (tanh(sigmaFront) - tanh(sigmaBack)) / (2. * tanhSigmaCenter);
-	float sechDiff = sechSq(sigmaFront) - sechSq(sigmaBack);
-	float dfScalar = sechDiff / (2. * rs * tanhSigmaCenter);				
+	return f;
+}
+
+float g_tt(vec3 pos, vec3 vel) {
+	float f = Alcubierre_f(pos);
 	float vf = f * warpBubbleVelocity;
 	float vf2 = vf * vf;
-	return 
-		(warpBubbleVelocity * f + sqrt(
-			vf2 * (1. + vel.x * vel.x) + 1.
-		)) / (-1. + vf2);
+	return -(1. - vf2); 
 }
+
+vec3 g_ti(vec3 pos, vec3 vel) {
+	float f = Alcubierre_f(pos);
+	float vf = f * warpBubbleVelocity;
+	float g_tx = -vf;
+	return vec3(g_tx, 0., 0.);
+}
+
+mat3 g_ij(vec3 pos, vec3 vel) {
+	return mat3(1.);
+}
+
 */}));
 							}	
 
 							fsh.push(mlstr(function(){/*
+
+//when initializing our metric:
+//g_ab v^a v^b = 0 for our metric g
+//g_tt (v^t)^2 + 2 g_ti v^t v^i + g_ij v^i v^j = 0
+//(v^t)^2 + (2 v^i g_ti / g_tt) v^t + g_ij v^i v^j / g_tt = 0
+//v_t = v^i g_ti / (-g_tt) +- sqrt( (v^i g_ti / g_tt)^2 + g_ij v^i v^j / (-g_tt) )
+// I'll go with the plus
+float reset_w(vec3 pos, vec3 vel) {
+	float _g_tt = g_tt(pos, vel);
+	float negInv_g_tt = -1. / _g_tt;
+	vec3 _g_ti = g_ti(pos, vel);
+	float v_t = dot(vel, _g_ti);	//v_t = g_ti v^i
+	float a = v_t * negInv_g_tt;
+	float bsq = a * a + dot(vel, g_ij(pos, vel) * vel) * negInv_g_tt;
+	if (bsq < 0.) bsq = 0.;
+	return a + sqrt(bsq);
+}
+
 varying vec3 vtxv;
 void main() {
+	vec3 pos = vec3(-objectDist, 0., 0.);
 	vec3 vel = normalize(vtxv);
 	gl_FragColor.xyz = vel;
-	gl_FragColor.w = reset_w(vel);
+	gl_FragColor.w = reset_w(pos, vel);
 }
 */}));						
 						}
@@ -193,12 +221,25 @@ vec4 accel(vec4 pos, vec4 vel) {
 	float posDotVelSq = posDotVel * posDotVel;
 	float velSq = dot(vel.xyz, vel.xyz);
 	float R = 2. * blackHoleMass;
-	float rSq = r * r;
-	float vtSq = vel.w * vel.w;
-	float scale = (R / (r * rSq)) * (.5 * vtSq * (1. - R / r) + velSq - .5 * posDotVelSq * (3. * r - 2. * R) / (rSq * (r - R)));
+	float r2 = r * r;
+	float r3 = r * r2;
+
+
+	float _m_2r = blackHoleMass / (2. * r);
+	float _1_plus_m_2r = 1. + _m_2r;
+	float _1_minus_m_2r = 1. - _m_2r;
+	
+	float _1_plus_m_2r_sq = _1_plus_m_2r * _1_plus_m_2r;
+	float _1_plus_m_2r_tothe3 = _1_plus_m_2r_sq * _1_plus_m_2r;
+	float _1_plus_m_2r_tothe6 = _1_plus_m_2r_tothe3 * _1_plus_m_2r_tothe3;
+	
 	vec4 result;
-	result.xyz = vel.xyz - deltaLambda * pos.xyz * scale;
-	result.w = vel.w - deltaLambda * R / (rSq * (r - R)) * posDotVel * vel.w;
+	result.w = -blackHoleMass * 2. * vel.w * posDotVel / (_1_plus_m_2r * _1_minus_m_2r * r3);
+	result.xyz = -blackHoleMass * (
+		vel.w * vel.w * pos.xyz * _1_minus_m_2r / _1_plus_m_2r_tothe6 
+		- 2. * vel.xyz * posDotVel
+		+ velSq * pos.xyz 
+	) / (_1_plus_m_2r * r3);
 	return result;
 }
 */}));
@@ -209,8 +250,7 @@ uniform float warpBubbleRadius;
 uniform float warpBubbleVelocity;
 
 vec4 accel(vec4 pos, vec4 vel) {
-	float rs = sqrt(dot(pos,pos) + objectDist * (-2. * pos.x + objectDist) );
-	//float rs = length(pos.xyz - vec3(objectDist, 0., 0.));
+	float rs = length(pos.xyz);
 	float sigmaFront = warpBubbleThickness * (rs + warpBubbleRadius);
 	float sigmaCenter = warpBubbleThickness * warpBubbleRadius;
 	float sigmaBack = warpBubbleThickness * (rs - warpBubbleRadius);
@@ -222,7 +262,7 @@ vec4 accel(vec4 pos, vec4 vel) {
 	fv.xyz = warpBubbleThickness * pos.xyz * dfScalar;
 	fv.w = -warpBubbleVelocity * warpBubbleThickness * pos.x * dfScalar;
 	vec4 result;
-	result.w = vel.w - deltaLambda * (f * f * fv.x * warpBubbleVelocity * warpBubbleVelocity * warpBubbleVelocity * vel.w * vel.w
+	result.w = -(f * f * fv.x * warpBubbleVelocity * warpBubbleVelocity * warpBubbleVelocity * vel.w * vel.w
 		- 2. * f * fv.x * warpBubbleVelocity * warpBubbleVelocity * vel.w * vel.x
 		- 2. * f * fv.y * warpBubbleVelocity * warpBubbleVelocity / 2. * vel.w * vel.y
 		- 2. * f * fv.z * warpBubbleVelocity * warpBubbleVelocity / 2. * vel.w * vel.z
@@ -230,7 +270,7 @@ vec4 accel(vec4 pos, vec4 vel) {
 		+ 2. * fv.y * warpBubbleVelocity / 2. * vel.x * vel.y
 		+ 2. * fv.z * warpBubbleVelocity / 2. * vel.x * vel.z
 	);
-	result.x = vel.x - deltaLambda * ((f * f * f * fv.x * warpBubbleVelocity * warpBubbleVelocity * warpBubbleVelocity * warpBubbleVelocity - f * fv.x * warpBubbleVelocity * warpBubbleVelocity - fv.w * warpBubbleVelocity) * vel.w * vel.w
+	result.x = -((f * f * f * fv.x * warpBubbleVelocity * warpBubbleVelocity * warpBubbleVelocity * warpBubbleVelocity - f * fv.x * warpBubbleVelocity * warpBubbleVelocity - fv.w * warpBubbleVelocity) * vel.w * vel.w
 		- 2. * f * f * fv.x * warpBubbleVelocity * warpBubbleVelocity * warpBubbleVelocity * vel.w * vel.x
 		- 2. * (f * f * fv.y * warpBubbleVelocity * warpBubbleVelocity * warpBubbleVelocity + fv.y * warpBubbleVelocity) / 2. * vel.w * vel.y
 		- 2. * (f * f * fv.z * warpBubbleVelocity * warpBubbleVelocity * warpBubbleVelocity + fv.z * warpBubbleVelocity) / 2. * vel.w * vel.z
@@ -238,12 +278,10 @@ vec4 accel(vec4 pos, vec4 vel) {
 		+ 2. * f * fv.y * warpBubbleVelocity * warpBubbleVelocity / 2. * vel.x * vel.y
 		+ 2. * f * fv.z * warpBubbleVelocity * warpBubbleVelocity / 2. * vel.x * vel.z
 	);
-	result.y = vel.y + deltaLambda * (f * fv.y * warpBubbleVelocity * warpBubbleVelocity * vel.w * vel.w
-		+ 2. * fv.y * warpBubbleVelocity / 2. * vel.w * vel.x
-	);
-	result.z = vel.z + deltaLambda * (f * fv.z * warpBubbleVelocity * warpBubbleVelocity * vel.w * vel.w
-		+ 2. * fv.z * warpBubbleVelocity / 2. * vel.w * vel.x
-	);
+	result.y = f * fv.y * warpBubbleVelocity * warpBubbleVelocity * vel.w * vel.w
+		+ 2. * fv.y * warpBubbleVelocity / 2. * vel.w * vel.x;
+	result.z = f * fv.z * warpBubbleVelocity * warpBubbleVelocity * vel.w * vel.w
+		+ 2. * fv.z * warpBubbleVelocity / 2. * vel.w * vel.x;
 	return result;
 }
 */}));
@@ -263,7 +301,7 @@ void main() {
 */}));
 						} else if (pos_or_vel == 'vel') {
 							fsh.push(mlstr(function(){/*
-	gl_FragColor = accel(pos, vel);
+	gl_FragColor = vel + deltaLambda * accel(pos, vel);
 }
 */}));
 						}

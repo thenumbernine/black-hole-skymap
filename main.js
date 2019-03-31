@@ -6,11 +6,11 @@ var glutil;
 var objectTypes = ['Black Hole', 'Alcubierre Warp Drive Bubble'];
 var objectType = objectTypes[0];
 var objectDist = 10;
-var blackHoleMass = .1;
+var blackHoleMass = .5;
 var warpBubbleThickness = .05;
 var warpBubbleVelocity = 2;
 var warpBubbleRadius = 2;
-var deltaLambda = .1;	//ray forward iteration
+var deltaLambda = 1;	//ray forward iteration
 
 var ident4 = mat4.create();
 
