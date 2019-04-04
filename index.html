@@ -45,20 +45,26 @@ _gaq.push(['_trackPageview']);
 			Iteration d/dLambda: <input id='deltaLambda'/><br>
 			<select id='objectTypes'></select><br>
 			Object Distance (m): <input id='objectDist'/><br>
-			<div id="Black_Hole_params">
-				Black Hole Mass (kg): <input id='blackHoleMass'/><br>
+			
+			<!-- TODO only show this for Schwarzschild/Kerr black holes -->
+			Black Hole Mass (kg): <input id='blackHoleMass'/><br>
+			<div id="Schwarzschild_Black_Hole_params">
+			</div>
+			<div id="Schwarzschild_Black_Hole_params">
+				Black Hole Charge (kg): <input id='blackHoleCharge'/><br>
+				Black Hole Angular Velocity (kg): <input id='blackHoleAngularVelocity'/><br>
 			</div>
 			<div id="Alcubierre_Warp_Drive_Bubble_params">
 				Warp Bubble Thickness: <input id='warpBubbleThickness'/><br>
 				Warp Bubble Velocity (c): <input id='warpBubbleVelocity'/><br>
 				Warp Bubble Radius: <input id='warpBubbleRadius'/><br>
 			</div>
-			<!-- input type='radio' name='1' id='GeodesicTestCubeRenderer'>Original Background</input><br -->
-			<!-- input type='radio' name='1' id='GeodesicSWRenderer'>Software update</input><br -->
-			<!-- input type='radio' name='1' id='GeodesicFBORenderer'>FBO update</input><br -->
+		
+			<!--
+			<input type='radio' name='mouseMethod' id='mouseMethod_rotateCamera' value='rotateCamera' checked=1/> rotate camera<br>
+			<input type='radio' name='mouseMethod' id='mouseMethod_rotateObject' value='rotateObject'/> rotate object<br>
+			-->	
 			<button id='reset'>Reset</button><br>
-			<!-- button id='pause'>Pause</button><br -->
-			<!-- Update: <progress id='update-progress' max='100' value='0'></progress><br> -->
 		</div>
 			
 		<div id='info' style='display:none; overflow:scroll; top:32px; z-index:1; position:absolute; background-color:rgba(255,255,255,.85); color:black; padding:10px'>

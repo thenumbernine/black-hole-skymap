@@ -20,10 +20,13 @@ GeodesicFBORenderer = makeClass({
 			//working on how to organize this
 			channel.uniforms = [
 				'blackHoleMass', 
+				'blackHoleCharge', 
+				'blackHoleAngularVelocity', 
 				'warpBubbleThickness', 
 				'warpBubbleRadius', 
 				'warpBubbleVelocity', 
 				'objectDist', 
+				'objectAngle', 
 				'deltaLambda'
 			];
 			
@@ -68,9 +71,15 @@ GeodesicFBORenderer = makeClass({
 				var shaderTypes = ['reset', 'iterate'];
 				
 				$.each(shaderTypes, function(_,shaderType) {
-
+					
 					var vsh = [];
 					var fsh = [shaderCommonCode];
+
+					fsh.push(mlstr(function(){/*
+uniform float objectDist;
+uniform vec4 objectAngle;
+*/}));
+
 					if (shaderType == 'reset') {
 						
 						//new
@@ -83,24 +92,21 @@ void main() {
 	gl_Position = vec4(vertex * 2. - 1., 0., 1.);
 }
 */}));
-							fsh.push(mlstr(function(){/*
-uniform float objectDist;
-*/}));
 						if (pos_or_vel == 'pos') {
 							fsh.push(mlstr(function(){/*
 varying vec3 vtxv;
 void main() {
-	gl_FragColor = vec4(0.);
-	gl_FragColor.x -= objectDist;
+	gl_FragColor = vec4(-objectDist, 0., 0., 0.);
+	gl_FragColor.xyz = quatRotate(objectAngle, gl_FragColor.xyz);
 }
 */}));
 						} else if (pos_or_vel == 'vel') {
-							if (objType == 'Black Hole') {
+							if (objType == 'Schwarzschild Black Hole') {
 								fsh.push(mlstr(function(){/*
 uniform float blackHoleMass;
 
 // g_tt = -(1 - m/(2r))^2 / (1 + m/(2r))^2
-float g_tt(vec3 pos, vec3 vel) {
+float g_tt(vec3 pos) {
 	float r = length(pos);
 	float _m_2r = blackHoleMass / (2. * r);
 	float _1_plus_m_2r = 1. + _m_2r;
@@ -110,12 +116,12 @@ float g_tt(vec3 pos, vec3 vel) {
 }
 
 // g_ti = 0
-vec3 g_ti(vec3 pos, vec3 vel) { 
+vec3 g_ti(vec3 pos) { 
 	return vec3(0., 0., 0.); 
 }
 
 // g_ij = delta_ij (1 + m/(2r))^4 
-mat3 g_ij(vec3 pos, vec3 vel) {
+mat3 g_ij(vec3 pos) {
 	float r = length(pos);
 	float _m_2r = blackHoleMass / (2. * r);
 	float _1_plus_m_2r = 1. + _m_2r;
@@ -124,7 +130,62 @@ mat3 g_ij(vec3 pos, vec3 vel) {
 	return mat3(_1_plus_m_2r_toTheFourth);
 }
 
-*/}));						
+*/}));
+							} else if (objType == 'Kerr Black Hole') {
+								fsh.push(mlstr(function(){/*
+uniform float blackHoleMass;
+uniform float blackHoleCharge;
+uniform float blackHoleAngularMomentum;
+
+float g_tt(vec3 pos) {
+	float rs = 2. * blackHoleMass;
+	float Q = blackHoleCharge;
+	float a = blackHoleAngularMomentum / blackHoleMass;
+	float z = pos.z;
+	float b = a*a - dot(pos,pos);
+	float rSq = .5*(-b + sqrt(b*b + 4.*a*a*z*z));
+	float r = sqrt(rSq);
+	float H = .5 * (r * rs - Q * Q) / (rSq + a*a*z*z/rSq);
+	return -1. + 2. * H;
+}
+
+vec3 g_ti(vec3 pos) { 
+	float rs = 2. * blackHoleMass;
+	float Q = blackHoleCharge;
+	float a = blackHoleAngularMomentum / blackHoleMass;
+	float x = pos.x;
+	float y = pos.y;
+	float z = pos.z;
+	float b = a*a - dot(pos,pos);
+	float rSq = .5*(-b + sqrt(b*b + 4.*a*a*z*z));
+	float r = sqrt(rSq);
+	float H = .5 * (r * rs - Q * Q) / (rSq + a*a*z*z/rSq);
+	vec3 l = vec3(
+		(r*x + a*y)/(rSq + a*a),
+		(r*y - a*x)/(rSq + a*a),
+		z/r);
+	return 2. * H * l;
+}
+
+mat3 g_ij(vec3 pos) {
+	float rs = 2. * blackHoleMass;
+	float Q = blackHoleCharge;
+	float a = blackHoleAngularMomentum / blackHoleMass;
+	float x = pos.x;
+	float y = pos.y;
+	float z = pos.z;
+	float b = a*a - dot(pos,pos);
+	float rSq = .5*(-b + sqrt(b*b + 4.*a*a*z*z));
+	float r = sqrt(rSq);
+	float H = .5 * (r * rs - Q * Q) / (rSq + a*a*z*z/rSq);
+	vec3 l = vec3(
+		(r*x + a*y)/(rSq + a*a),
+		(r*y - a*x)/(rSq + a*a),
+		z/r);
+	return mat3(1.) + 2. * H * outerProduct(l,l);
+}
+
+*/}));
 							} else if (objType == 'Alcubierre Warp Drive Bubble') {
 								fsh.push(mlstr(function(){/*
 uniform float warpBubbleThickness;
@@ -141,21 +202,21 @@ float Alcubierre_f(vec3 pos) {
 	return f;
 }
 
-float g_tt(vec3 pos, vec3 vel) {
+float g_tt(vec3 pos) {
 	float f = Alcubierre_f(pos);
 	float vf = f * warpBubbleVelocity;
 	float vf2 = vf * vf;
 	return -(1. - vf2); 
 }
 
-vec3 g_ti(vec3 pos, vec3 vel) {
+vec3 g_ti(vec3 pos) {
 	float f = Alcubierre_f(pos);
 	float vf = f * warpBubbleVelocity;
 	float g_tx = -vf;
 	return vec3(g_tx, 0., 0.);
 }
 
-mat3 g_ij(vec3 pos, vec3 vel) {
+mat3 g_ij(vec3 pos) {
 	return mat3(1.);
 }
 
@@ -171,12 +232,12 @@ mat3 g_ij(vec3 pos, vec3 vel) {
 //v_t = v^i g_ti / (-g_tt) +- sqrt( (v^i g_ti / g_tt)^2 + g_ij v^i v^j / (-g_tt) )
 // I'll go with the plus
 float reset_w(vec3 pos, vec3 vel) {
-	float _g_tt = g_tt(pos, vel);
+	float _g_tt = g_tt(pos);
 	float negInv_g_tt = -1. / _g_tt;
-	vec3 _g_ti = g_ti(pos, vel);
+	vec3 _g_ti = g_ti(pos);
 	float v_t = dot(vel, _g_ti);	//v_t = g_ti v^i
 	float a = v_t * negInv_g_tt;
-	float bsq = a * a + dot(vel, g_ij(pos, vel) * vel) * negInv_g_tt;
+	float bsq = a * a + dot(vel, g_ij(pos) * vel) * negInv_g_tt;
 	if (bsq < 0.) bsq = 0.;
 	return a + sqrt(bsq);
 }
@@ -184,7 +245,11 @@ float reset_w(vec3 pos, vec3 vel) {
 varying vec3 vtxv;
 void main() {
 	vec3 pos = vec3(-objectDist, 0., 0.);
+	pos = quatRotate(quatConj(objectAngle), pos);
+	
 	vec3 vel = normalize(vtxv);
+	vel = quatRotate(quatConj(objectAngle), vel);
+	
 	gl_FragColor.xyz = vel;
 	gl_FragColor.w = reset_w(pos, vel);
 }
@@ -206,12 +271,11 @@ void main() {
 varying vec2 uv;
 varying vec3 vtxv;
 uniform float deltaLambda;
-uniform float objectDist;
 uniform sampler2D lightPosTex;
 uniform sampler2D lightVelTex;
 */}));
 						if (pos_or_vel == 'vel') {
-							if (objType == 'Black Hole') {
+							if (objType == 'Schwarzschild Black Hole') {
 								fsh.push(mlstr(function(){/*
 uniform float blackHoleMass;
 
@@ -243,6 +307,120 @@ vec4 accel(vec4 pos, vec4 vel) {
 	return result;
 }
 */}));
+							} else if (objType == 'Kerr Black Hole') {
+								fsh.push(mlstr(function(){/*
+uniform float blackHoleMass;
+uniform float blackHoleCharge;
+uniform float blackHoleAngularMomentum;
+
+//TODO FIXME
+vec4 accel(vec4 pos, vec4 vel) {
+return vec4(0.);
+	float t = pos.w;
+	float x = pos.x;
+	float y = pos.y;
+	float z = pos.z;
+
+	float rs = 2. * blackHoleMass;
+	float Q = blackHoleCharge;
+	float a = blackHoleAngularMomentum / blackHoleMass;
+	float aSq = a*a;
+	float b = aSq - dot(pos.xyz, pos.xyz);
+	float sqrtdiscr = sqrt(b*b + 4.*aSq*z*z);
+	float rSq = .5*(-b + sqrtdiscr);
+	float r = sqrt(rSq);
+	float H = .5 * (r * rs - Q * Q) / (rSq + aSq*z*z/rSq);
+
+	vec3 db_dxis = -2. * pos.xyz;
+	vec3 dr_dxis;
+	for (int i = 0; i < 3; ++i) {
+		dr_dxis[i] = (
+			-.25 * db_dxis[i] 
+			+ .5 * (
+				b * db_dxis[i] 
+				+ (i == 2 ? (4.*aSq*z) : 0.)
+			) / sqrtdiscr
+		) / r;
+	}
+	vec4 dH_dx;	//stored xyzt
+	dH_dx.w = 0.;
+	for (int i = 0; i < 3; ++i) {
+		dH_dx[i] = .5 * (
+			dr_dxis[i] * rs * (rSq + aSq*z*z / rSq)
+			- (r * rs - Q*Q) * (
+				2. * r * dr_dxis[i]
+				+ aSq*(
+					(i == 2 ? (2. * z / rSq) : 0.)
+					- 2. * z*z*r*dr_dxis[i]
+				)
+			)
+		);
+	}
+
+	float aSq_plus_rSq = rSq + aSq;
+	
+	vec4 l = vec4(
+		(r*x + a*y)/aSq_plus_rSq,
+		(r*y - a*x)/aSq_plus_rSq,
+		z/r,
+		1.
+	);
+
+	vec4 lU = l;
+	lU.w = -lU.w;
+
+	mat4 gInv = mat4(
+		vec4(1., 0., 0., 0.),
+		vec4(0., 1., 0., 0.),
+		vec4(0., 0., 1., 0.),
+		vec4(0., 0., 0., -1.)
+	) - 2. * H * outerProduct(lU, lU);
+
+
+	// l_a,b == dl_dx[a][b]
+	mat4 dl_dx = mat4(
+		vec4(
+			(dr_dxis[0] * (x * (aSq - rSq) - 2. * a * y * r) / aSq_plus_rSq + r) / aSq_plus_rSq,
+			(dr_dxis[1]  * (x * (aSq - rSq) - 2. * a * y * r) / aSq_plus_rSq + a) / aSq_plus_rSq,
+			-dr_dxis[2] * (x * (aSq - rSq) - 2. * a * y * r) / (aSq_plus_rSq * aSq_plus_rSq),
+			0.),
+		vec4(
+			(dr_dxis[0] * (y * (aSq - rSq) + 2. * a * x * r) / aSq_plus_rSq - a) / aSq_plus_rSq,
+			(dr_dxis[1] * (y * (aSq - rSq) + 2. * a * x * r) / aSq_plus_rSq + r) / aSq_plus_rSq,
+			dr_dxis[2] * (y * (aSq - rSq) + 2. * a * x * r) / (aSq_plus_rSq * aSq_plus_rSq),
+			0.),
+		vec4(
+			-z * dr_dxis[0] / rSq,
+			-z * dr_dxis[1] / rSq,
+			1./r - z * dr_dxis[2] / rSq,
+			0.),
+		vec4(0., 0., 0., 0.));
+	
+	// conn_abc = H,a l_b l_c + H,b l_a l_c + H,c l_a l_b
+	//		+ H (l_a (l_b,c + l_c,b) + l_b (l_a,c + l_c,a) + l_c (l_a,b + l_b,a))
+	vec4 conn_vel_vel;
+	for (int a = 0; a < 4; ++a) {
+		float sum = 0.;
+		for (int b = 0; b < 4; ++b) {
+			for (int c = 0; c < 4; ++c) {
+				float conn_lll = dH_dx[a] * l[b] * l[c]
+					+ dH_dx[b] * l[a] * l[c]
+					+ dH_dx[c] * l[a] * l[b]
+					+ H * (
+						l[a] * (dl_dx[b][c] + dl_dx[c][b])
+						+ l[b] * (dl_dx[a][c] + dl_dx[c][a])
+						+ l[c] * (dl_dx[a][b] + dl_dx[b][a])
+					);
+				sum += conn_lll * vel[b] * vel[c];
+			}
+		}
+		conn_vel_vel[a] = sum;
+	}
+	
+	// conn^a_bc = g^ad conn_dbc
+	return -gInv * conn_vel_vel;
+}
+*/}));						
 							} else if (objType == 'Alcubierre Warp Drive Bubble') {
 								fsh.push(mlstr(function(){/*
 uniform float warpBubbleThickness;
@@ -276,7 +454,6 @@ vec4 accel(vec4 pos, vec4 vel) {
 		+ du.y * vel.w * vel.y * u
 		+ du.z * vel.w * vel.z * u
 	;
-	
 	result.x = 
 		du.w * vel.w * vel.w
 		+ du.y * vel.w * vel.y
@@ -299,6 +476,8 @@ vec4 accel(vec4 pos, vec4 vel) {
 						}
 					
 						fsh.push(mlstr(function(){/*
+#define maxRadius 1e+6
+
 void main() {
 	vec4 pos = texture2D(lightPosTex, uv);
 	vec4 vel = texture2D(lightVelTex, uv);
@@ -306,12 +485,20 @@ void main() {
 */}));
 						if (pos_or_vel == 'pos') {
 							fsh.push(mlstr(function(){/*
-	gl_FragColor = pos + deltaLambda * vel;
+	float distSq = dot(pos.xyz, pos.xyz);
+	gl_FragColor = pos;
+	if (distSq < maxRadius) {
+		gl_FragColor += deltaLambda * vel;
+	}
 }
 */}));
 						} else if (pos_or_vel == 'vel') {
 							fsh.push(mlstr(function(){/*
-	gl_FragColor = vel + deltaLambda * accel(pos, vel);
+	float distSq = dot(pos.xyz, pos.xyz);
+	gl_FragColor = vel;
+	if (distSq < maxRadius) {
+		gl_FragColor += deltaLambda * accel(pos, vel);
+	}
 }
 */}));
 						}
@@ -336,18 +523,17 @@ void main() {
 
 		var cubeShader = new this.glutil.ShaderProgram({
 			vertexPrecision : 'best',
-			vertexCode : mlstr(function(){/*
+			vertexCode : shaderCommonCode + mlstr(function(){/*
 attribute vec2 vertex;
 varying vec2 uv;
 uniform mat4 projMat;
 uniform vec4 angle;
+
 const mat3 viewMatrix = mat3(
 	0., 0., -1.,
 	1., 0., 0., 
 	0., -1., 0.);
-vec3 quatRotate(vec4 q, vec3 v) { 
-	return v + 2. * cross(cross(v, q.xyz) - q.w * v, q.xyz);
-}
+
 void main() {
 	uv = vertex;
 	vec3 vtx3 = vec3(vertex * 2. - 1., 1.);
@@ -363,20 +549,20 @@ varying vec2 uv;
 uniform samplerCube skyTex;
 uniform sampler2D lightVelTex;
 uniform vec4 viewAngle;
+
 const mat3 viewMatrixInv = mat3(
 	0., 1., 0.,
 	0., 0., -1.,
 	-1., 0., 0.);
-vec3 quatRotate(vec4 q, vec3 v) { 
-	return v + 2. * cross(cross(v, q.xyz) - q.w * v, q.xyz);
-}
+
 void main() {
 	vec3 dir = texture2D(lightVelTex, uv).xyz;
 	dir = viewMatrixInv * viewMatrixInv * dir;
 	dir = quatRotate(viewAngle, dir);
 	gl_FragColor.xyz = textureCube(skyTex, dir).xyz;
 	gl_FragColor.w = 1.; 
-}*/}),
+}
+*/}),
 			uniforms : {
 				skyTex : 0,
 				lightVelTex : 1
@@ -401,8 +587,6 @@ void main() {
 				texs : [skyTex, this.lightPosVelChannels[1].texs[0][side]],
 			});
 		}
-
-
 	},
 
 	resetField : function() {

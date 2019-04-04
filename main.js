@@ -3,10 +3,16 @@ var canvas;
 var gl;
 var glutil;
 
-var objectTypes = ['Black Hole', 'Alcubierre Warp Drive Bubble'];
+var objectTypes = [
+	'Schwarzschild Black Hole',	
+	'Kerr Black Hole',	
+	'Alcubierre Warp Drive Bubble',
+];
 var objectType = objectTypes[0];
 var objectDist = 10;
 var blackHoleMass = .5;
+var blackHoleCharge = 0.;
+var blackHoleAngularVelocity = 0.;
 
 var warpBubbleThickness = .01;
 var warpBubbleVelocity = 1.5;
@@ -45,6 +51,31 @@ float sech(float x) {
 float sechSq(float x) {
 	float y = sech(x);
 	return y * y;
+}
+
+mat3 outerProduct(vec3 a, vec3 b) {
+	return mat3(
+		vec3(a.x * b.x, a.x * b.y, a.x * b.z),
+		vec3(a.y * b.x, a.y * b.y, a.y * b.z),
+		vec3(a.z * b.x, a.z * b.y, a.z * b.z)
+	);
+}
+
+mat4 outerProduct(vec4 a, vec4 b) {
+	return mat4(
+		vec4(a.x * b.x, a.x * b.y, a.x * b.z, a.x * b.w),
+		vec4(a.y * b.x, a.y * b.y, a.y * b.z, a.y * b.w),
+		vec4(a.z * b.x, a.z * b.y, a.z * b.z, a.z * b.w),
+		vec4(a.w * b.x, a.w * b.y, a.w * b.z, a.w * b.w)
+	);
+}
+
+vec3 quatRotate(vec4 q, vec3 v) { 
+	return v + 2. * cross(cross(v, q.xyz) - q.w * v, q.xyz);
+}
+
+vec4 quatConj(vec4 q) {
+	return vec4(q.xyz, -q.w);
 }
 */});
 
@@ -107,9 +138,18 @@ function update() {
 	requestAnimFrame(update);
 };
 
+var mouseMethod = 'rotateCamera';
+//var mouseMethod = 'rotateObject';
 var mouse;
+
+var objectAngle = quat.create();
+
 function main3(skyTex) {
 	skyboxRenderer.initScene(skyTex);
+
+
+	$('#mouseMethod_rotateCamera').click(function() { mouseMethod = 'rotateCamera'; });
+	$('#mouseMethod_rotateObject').click(function() { mouseMethod = 'rotateObject'; });
 
 	var tmpQ = quat.create();	
 	mouse = new Mouse3D({
@@ -118,8 +158,15 @@ function main3(skyTex) {
 			var rotAngle = Math.PI / 180 * .01 * Math.sqrt(dx*dx + dy*dy);
 			quat.setAxisAngle(tmpQ, [dy, dx, 0], rotAngle);
 
-			quat.mul(glutil.view.angle, glutil.view.angle, tmpQ);
-			quat.normalize(glutil.view.angle, glutil.view.angle);
+			if (mouseMethod == 'rotateCamera') {
+				quat.mul(glutil.view.angle, glutil.view.angle, tmpQ);
+				quat.normalize(glutil.view.angle, glutil.view.angle);
+			} else if (mouseMethod == 'rotateObject') {
+				quat.conjugate(tmpQ, tmpQ);
+				quat.mul(objectAngle, tmpQ, objectAngle);
+				quat.normalize(objectAngle, objectAngle);
+skyboxRenderer.resetField();
+			}
 		},
 		zoom : function(dz) {
 			glutil.view.fovY *= Math.exp(-.0003 * dz);
@@ -239,6 +286,8 @@ function main1() {
 		'deltaLambda',
 		'objectDist',
 		'blackHoleMass',
+		'blackHoleCharge',
+		'blackHoleAngularVelocity',
 		'warpBubbleThickness',
 		'warpBubbleVelocity',
 		'warpBubbleRadius'
