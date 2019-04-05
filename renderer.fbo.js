@@ -62,47 +62,9 @@ GeodesicFBORenderer = makeClass({
 			}
 			
 			channel.shaders = {};
-					
-			$.each(objectTypes, function(_,objType) {
-				var pos_or_vel = channel.pos_or_vel;
-				
-				channel.shaders[objType] = {};
-				
-				var shaderTypes = ['reset', 'iterate'];
-				
-				$.each(shaderTypes, function(_,shaderType) {
-					
-					var vsh = [];
-					var fsh = [shaderCommonCode];
 
-					fsh.push(mlstr(function(){/*
-uniform float objectDist;
-uniform vec4 objectAngle;
-*/}));
-
-					if (shaderType == 'reset') {
-						
-						//new
-						vsh.push(mlstr(function(){/*
-attribute vec2 vertex;
-varying vec3 vtxv;
-uniform mat3 rotation;
-void main() {
-	vtxv = rotation * vec3(vertex * 2. - 1., 1.);
-	gl_Position = vec4(vertex * 2. - 1., 0., 1.);
-}
-*/}));
-						if (pos_or_vel == 'pos') {
-							fsh.push(mlstr(function(){/*
-varying vec3 vtxv;
-void main() {
-	gl_FragColor = vec4(-objectDist, 0., 0., 0.);
-	gl_FragColor.xyz = quatRotate(objectAngle, gl_FragColor.xyz);
-}
-*/}));
-						} else if (pos_or_vel == 'vel') {
-							if (objType == 'Schwarzschild Black Hole') {
-								fsh.push(mlstr(function(){/*
+			var metricCodes = {
+				['Schwarzschild Black Hole'] : mlstr(function(){/*
 uniform float blackHoleMass;
 
 // g_tt = -(1 - m/(2r))^2 / (1 + m/(2r))^2
@@ -130,9 +92,93 @@ mat3 g_ij(vec3 pos) {
 	return mat3(_1_plus_m_2r_toTheFourth);
 }
 
-*/}));
-							} else if (objType == 'Kerr Black Hole') {
-								fsh.push(mlstr(function(){/*
+vec4 accel(vec4 pos, vec4 vel) {
+	float r = length(pos.xyz);
+	float posDotVel = dot(pos.xyz, vel.xyz);
+	float posDotVelSq = posDotVel * posDotVel;
+	float velSq = dot(vel.xyz, vel.xyz);
+	float R = 2. * blackHoleMass;
+	float r2 = r * r;
+	float r3 = r * r2;
+
+
+	float _m_2r = blackHoleMass / (2. * r);
+	float _1_plus_m_2r = 1. + _m_2r;
+	float _1_minus_m_2r = 1. - _m_2r;
+	
+	float _1_plus_m_2r_sq = _1_plus_m_2r * _1_plus_m_2r;
+	float _1_plus_m_2r_tothe3 = _1_plus_m_2r_sq * _1_plus_m_2r;
+	float _1_plus_m_2r_tothe6 = _1_plus_m_2r_tothe3 * _1_plus_m_2r_tothe3;
+	
+	vec4 result;
+	result.w = -blackHoleMass * 2. * vel.w * posDotVel / (_1_plus_m_2r * _1_minus_m_2r * r3);
+	result.xyz = -blackHoleMass * (
+		vel.w * vel.w * pos.xyz * _1_minus_m_2r / _1_plus_m_2r_tothe6 
+		- 2. * vel.xyz * posDotVel
+		+ velSq * pos.xyz 
+	) / (_1_plus_m_2r * r3);
+	return result;
+}
+
+*/}),
+				
+				// substitution of a=0, Q=0, simlpified
+				// This somewhat match the Schwarzschild isotropic geodesic above
+				// The full Kerr geodesic below isn't working.
+				['Kerr Black Hole'] : mlstr(function(){/*
+uniform float blackHoleMass;
+uniform float blackHoleCharge;
+uniform float blackHoleAngularMomentum;
+
+float g_tt(vec3 pos) {
+	return -1. + 2. * blackHoleMass / length(pos.xyz);
+}
+
+vec3 g_ti(vec3 pos) { 
+	float R = 2. * blackHoleMass;
+	return R * pos.xyz / dot(pos.xyz, pos.xyz);
+}
+
+mat3 g_ij(vec3 pos) {
+	float R = 2. * blackHoleMass;
+	float inv_r = 1. / length(pos.xyz);
+	float R_r = R * inv_r;
+	vec3 npos = pos.xyz * inv_r;	
+	return mat3(1.) + R_r * outerProduct(npos, npos);
+}
+
+vec4 accel(vec4 pos, vec4 vel) {
+	float R = 2. * blackHoleMass;
+	
+	float inv_r = 1. / length(pos.xyz);
+	vec4 npos = pos * inv_r;	
+	vec4 nvel = vel * inv_r;
+
+	float R_r = R * inv_r;
+	float npos_nvel = dot(npos.xyz, nvel.xyz);
+	float nvel_nvel = dot(nvel.xyz, nvel.xyz);
+	
+	vec4 neg_accel;
+	neg_accel.w = R * (
+		.5 * R_r * nvel.w * nvel.w
+		+ npos_nvel * (1. + R_r) * nvel.w
+		+ npos_nvel * npos_nvel * (2. + .5 * R_r) 
+		- nvel_nvel
+	);
+	neg_accel.xyz = (R * (
+		.5 * (1. - R_r) * nvel.w * nvel.w
+		- R_r * npos_nvel * nvel.w
+		+ nvel_nvel
+		- .5 * inv_r * npos_nvel * npos_nvel * (3. - R_r)
+	)) * npos.xyz;
+	return -neg_accel;
+}
+*/}),
+			
+				
+				
+				
+				['(correct) Kerr Black Hole'] : mlstr(function(){/*
 uniform float blackHoleMass;
 uniform float blackHoleCharge;
 uniform float blackHoleAngularMomentum;
@@ -167,6 +213,8 @@ vec3 g_ti(vec3 pos) {
 	return 2. * H * l;
 }
 
+float cubed(x) { return x * x * x; }
+
 mat3 g_ij(vec3 pos) {
 	float rs = 2. * blackHoleMass;
 	float Q = blackHoleCharge;
@@ -185,137 +233,8 @@ mat3 g_ij(vec3 pos) {
 	return mat3(1.) + 2. * H * outerProduct(l,l);
 }
 
-*/}));
-							} else if (objType == 'Alcubierre Warp Drive Bubble') {
-								fsh.push(mlstr(function(){/*
-uniform float warpBubbleThickness;
-uniform float warpBubbleVelocity;
-uniform float warpBubbleRadius;
-
-float Alcubierre_f(vec3 pos) {
-	float rs = length(pos);
-	float sigmaFront = warpBubbleThickness * (rs + warpBubbleRadius);
-	float sigmaCenter = warpBubbleThickness * warpBubbleRadius;
-	float sigmaBack = warpBubbleThickness * (rs - warpBubbleRadius);
-	float tanhSigmaCenter = tanh(sigmaCenter);
-	float f = (tanh(sigmaFront) - tanh(sigmaBack)) / (2. * tanhSigmaCenter);
-	return f;
-}
-
-float g_tt(vec3 pos) {
-	float f = Alcubierre_f(pos);
-	float vf = f * warpBubbleVelocity;
-	float vf2 = vf * vf;
-	return -(1. - vf2); 
-}
-
-vec3 g_ti(vec3 pos) {
-	float f = Alcubierre_f(pos);
-	float vf = f * warpBubbleVelocity;
-	float g_tx = -vf;
-	return vec3(g_tx, 0., 0.);
-}
-
-mat3 g_ij(vec3 pos) {
-	return mat3(1.);
-}
-
-*/}));
-							}	
-
-							fsh.push(mlstr(function(){/*
-
-//when initializing our metric:
-//g_ab v^a v^b = 0 for our metric g
-//g_tt (v^t)^2 + 2 g_ti v^t v^i + g_ij v^i v^j = 0
-//(v^t)^2 + (2 v^i g_ti / g_tt) v^t + g_ij v^i v^j / g_tt = 0
-//v_t = v^i g_ti / (-g_tt) +- sqrt( (v^i g_ti / g_tt)^2 + g_ij v^i v^j / (-g_tt) )
-// I'll go with the plus
-float reset_w(vec3 pos, vec3 vel) {
-	float _g_tt = g_tt(pos);
-	float negInv_g_tt = -1. / _g_tt;
-	vec3 _g_ti = g_ti(pos);
-	float v_t = dot(vel, _g_ti);	//v_t = g_ti v^i
-	float a = v_t * negInv_g_tt;
-	float bsq = a * a + dot(vel, g_ij(pos) * vel) * negInv_g_tt;
-	if (bsq < 0.) bsq = 0.;
-	return a + sqrt(bsq);
-}
-
-varying vec3 vtxv;
-void main() {
-	vec3 pos = vec3(-objectDist, 0., 0.);
-	pos = quatRotate(quatConj(objectAngle), pos);
-	
-	vec3 vel = normalize(vtxv);
-	vel = quatRotate(quatConj(objectAngle), vel);
-	
-	gl_FragColor.xyz = vel;
-	gl_FragColor.w = reset_w(pos, vel);
-}
-*/}));						
-						}
-					} else if (shaderType == 'iterate') {
-						vsh.push(mlstr(function(){/*
-varying vec2 uv;
-varying vec3 vtxv;
-attribute vec2 vertex;
-uniform mat3 rotation;
-void main() {
-	uv = vertex;
-	vtxv = rotation * vec3(vertex * 2. - 1., 1.);
-	gl_Position = vec4(vertex * 2. - 1., 0., 1.);
-}
-*/}));
-						fsh.push(mlstr(function(){/*
-varying vec2 uv;
-varying vec3 vtxv;
-uniform float deltaLambda;
-uniform sampler2D lightPosTex;
-uniform sampler2D lightVelTex;
-*/}));
-						if (pos_or_vel == 'vel') {
-							if (objType == 'Schwarzschild Black Hole') {
-								fsh.push(mlstr(function(){/*
-uniform float blackHoleMass;
-
-vec4 accel(vec4 pos, vec4 vel) {
-	float r = length(pos.xyz);
-	float posDotVel = dot(pos.xyz, vel.xyz);
-	float posDotVelSq = posDotVel * posDotVel;
-	float velSq = dot(vel.xyz, vel.xyz);
-	float R = 2. * blackHoleMass;
-	float r2 = r * r;
-	float r3 = r * r2;
-
-
-	float _m_2r = blackHoleMass / (2. * r);
-	float _1_plus_m_2r = 1. + _m_2r;
-	float _1_minus_m_2r = 1. - _m_2r;
-	
-	float _1_plus_m_2r_sq = _1_plus_m_2r * _1_plus_m_2r;
-	float _1_plus_m_2r_tothe3 = _1_plus_m_2r_sq * _1_plus_m_2r;
-	float _1_plus_m_2r_tothe6 = _1_plus_m_2r_tothe3 * _1_plus_m_2r_tothe3;
-	
-	vec4 result;
-	result.w = -blackHoleMass * 2. * vel.w * posDotVel / (_1_plus_m_2r * _1_minus_m_2r * r3);
-	result.xyz = -blackHoleMass * (
-		vel.w * vel.w * pos.xyz * _1_minus_m_2r / _1_plus_m_2r_tothe6 
-		- 2. * vel.xyz * posDotVel
-		+ velSq * pos.xyz 
-	) / (_1_plus_m_2r * r3);
-	return result;
-}
-*/}));
-							} else if (objType == 'Kerr Black Hole') {
-								fsh.push(mlstr(function(){/*
-uniform float blackHoleMass;
-uniform float blackHoleCharge;
-uniform float blackHoleAngularMomentum;
-
 //TODO FIXME
 vec4 accel(vec4 pos, vec4 vel) {
-return vec4(0.);
 	float t = pos.w;
 	float x = pos.x;
 	float y = pos.y;
@@ -420,12 +339,39 @@ return vec4(0.);
 	// conn^a_bc = g^ad conn_dbc
 	return -gInv * conn_vel_vel;
 }
-*/}));						
-							} else if (objType == 'Alcubierre Warp Drive Bubble') {
-								fsh.push(mlstr(function(){/*
+*/}),
+				['Alcubierre Warp Drive Bubble'] : mlstr(function(){/*
 uniform float warpBubbleThickness;
-uniform float warpBubbleRadius;
 uniform float warpBubbleVelocity;
+uniform float warpBubbleRadius;
+
+float Alcubierre_f(vec3 pos) {
+	float rs = length(pos);
+	float sigmaFront = warpBubbleThickness * (rs + warpBubbleRadius);
+	float sigmaCenter = warpBubbleThickness * warpBubbleRadius;
+	float sigmaBack = warpBubbleThickness * (rs - warpBubbleRadius);
+	float tanhSigmaCenter = tanh(sigmaCenter);
+	float f = (tanh(sigmaFront) - tanh(sigmaBack)) / (2. * tanhSigmaCenter);
+	return f;
+}
+
+float g_tt(vec3 pos) {
+	float f = Alcubierre_f(pos);
+	float vf = f * warpBubbleVelocity;
+	float vf2 = vf * vf;
+	return -(1. - vf2); 
+}
+
+vec3 g_ti(vec3 pos) {
+	float f = Alcubierre_f(pos);
+	float vf = f * warpBubbleVelocity;
+	float g_tx = -vf;
+	return vec3(g_tx, 0., 0.);
+}
+
+mat3 g_ij(vec3 pos) {
+	return mat3(1.);
+}
 
 vec4 accel(vec4 pos, vec4 vel) {
 	float r = length(pos.xyz);
@@ -471,8 +417,102 @@ vec4 accel(vec4 pos, vec4 vel) {
 	result.z = -du.z * vel.w * (vel.x - vel.w * u);
 	return result;
 }
+
+*/})		
+			};
+					
+			$.each(objectTypes, function(_,objType) {
+				var pos_or_vel = channel.pos_or_vel;
+				
+				channel.shaders[objType] = {};
+
+				var shaderTypes = ['reset', 'iterate'];
+				
+				$.each(shaderTypes, function(_,shaderType) {
+					
+					var vsh = [];
+					var fsh = [shaderCommonCode];
+
+					fsh.push(mlstr(function(){/*
+uniform float objectDist;
+uniform vec4 objectAngle;
 */}));
-							}
+
+					if (shaderType == 'reset') {
+						
+						//new
+						vsh.push(mlstr(function(){/*
+attribute vec2 vertex;
+varying vec3 vtxv;
+uniform mat3 rotation;
+void main() {
+	vtxv = rotation * vec3(vertex * 2. - 1., 1.);
+	gl_Position = vec4(vertex * 2. - 1., 0., 1.);
+}
+*/}));
+						if (pos_or_vel == 'pos') {
+							fsh.push(mlstr(function(){/*
+varying vec3 vtxv;
+void main() {
+	gl_FragColor = vec4(-objectDist, 0., 0., 0.);
+	gl_FragColor.xyz = quatRotate(objectAngle, gl_FragColor.xyz);
+}
+*/}));
+						} else if (pos_or_vel == 'vel') {
+							fsh.push(metricCodes[objType]);
+							fsh.push(mlstr(function(){/*
+
+//when initializing our metric:
+//g_ab v^a v^b = 0 for our metric g
+//g_tt (v^t)^2 + 2 g_ti v^t v^i + g_ij v^i v^j = 0
+//(v^t)^2 + (2 v^i g_ti / g_tt) v^t + g_ij v^i v^j / g_tt = 0
+//v_t = v^i g_ti / (-g_tt) +- sqrt( (v^i g_ti / g_tt)^2 + g_ij v^i v^j / (-g_tt) )
+// I'll go with the plus
+float reset_w(vec3 pos, vec3 vel) {
+	float _g_tt = g_tt(pos);
+	float negInv_g_tt = -1. / _g_tt;
+	vec3 _g_ti = g_ti(pos);
+	float v_t = dot(vel, _g_ti);	//v_t = g_ti v^i
+	float a = v_t * negInv_g_tt;
+	float bsq = a * a + dot(vel, g_ij(pos) * vel) * negInv_g_tt;
+	if (bsq < 0.) bsq = 0.;
+	return a + sqrt(bsq);
+}
+
+varying vec3 vtxv;
+void main() {
+	vec3 pos = vec3(-objectDist, 0., 0.);
+	pos = quatRotate(quatConj(objectAngle), pos);
+	
+	vec3 vel = normalize(vtxv);
+	vel = quatRotate(quatConj(objectAngle), vel);
+	
+	gl_FragColor.xyz = vel;
+	gl_FragColor.w = reset_w(pos, vel);
+}
+*/}));
+						}
+					} else if (shaderType == 'iterate') {
+						vsh.push(mlstr(function(){/*
+varying vec2 uv;
+varying vec3 vtxv;
+attribute vec2 vertex;
+uniform mat3 rotation;
+void main() {
+	uv = vertex;
+	vtxv = rotation * vec3(vertex * 2. - 1., 1.);
+	gl_Position = vec4(vertex * 2. - 1., 0., 1.);
+}
+*/}));
+						fsh.push(mlstr(function(){/*
+varying vec2 uv;
+varying vec3 vtxv;
+uniform float deltaLambda;
+uniform sampler2D lightPosTex;
+uniform sampler2D lightVelTex;
+*/}));
+						if (pos_or_vel == 'vel') {
+							fsh.push(metricCodes[objType]);
 						}
 					
 						fsh.push(mlstr(function(){/*
