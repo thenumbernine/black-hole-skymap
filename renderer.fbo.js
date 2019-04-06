@@ -125,7 +125,7 @@ vec4 accel(vec4 pos, vec4 vel) {
 				// substitution of a=0, Q=0, simlpified
 				// This somewhat match the Schwarzschild isotropic geodesic above
 				// The full Kerr geodesic below isn't working.
-				['Kerr Black Hole'] : mlstr(function(){/*
+				['Kerr Black Hole degeneracy'] : mlstr(function(){/*
 uniform float blackHoleMass;
 uniform float blackHoleCharge;
 uniform float blackHoleAngularMomentum;
@@ -176,9 +176,7 @@ vec4 accel(vec4 pos, vec4 vel) {
 */}),
 			
 				
-				
-				
-				['(correct) Kerr Black Hole'] : mlstr(function(){/*
+				['Kerr Black Hole'] : mlstr(function(){/*
 uniform float blackHoleMass;
 uniform float blackHoleCharge;
 uniform float blackHoleAngularMomentum;
@@ -212,8 +210,6 @@ vec3 g_ti(vec3 pos) {
 		z/r);
 	return 2. * H * l;
 }
-
-float cubed(x) { return x * x * x; }
 
 mat3 g_ij(vec3 pos) {
 	float rs = 2. * blackHoleMass;
@@ -482,10 +478,10 @@ float reset_w(vec3 pos, vec3 vel) {
 varying vec3 vtxv;
 void main() {
 	vec3 pos = vec3(-objectDist, 0., 0.);
-	pos = quatRotate(quatConj(objectAngle), pos);
+	pos = quatRotate(objectAngle, pos);
 	
 	vec3 vel = normalize(vtxv);
-	vel = quatRotate(quatConj(objectAngle), vel);
+	vel = quatRotate(objectAngle, vel);
 	
 	gl_FragColor.xyz = vel;
 	gl_FragColor.w = reset_w(pos, vel);
@@ -529,6 +525,9 @@ void main() {
 	gl_FragColor = pos;
 	if (distSq < maxRadius) {
 		gl_FragColor += deltaLambda * vel;
+		if (gl_FragColor != gl_FragColor) {
+			gl_FragColor = pos;
+		}
 	}
 }
 */}));

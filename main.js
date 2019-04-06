@@ -5,6 +5,7 @@ var glutil;
 
 var objectTypes = [
 	'Schwarzschild Black Hole',	
+	'Kerr Black Hole degeneracy',	
 	'Kerr Black Hole',	
 	'Alcubierre Warp Drive Bubble',
 ];
@@ -144,6 +145,9 @@ var mouse;
 
 var objectAngle = quat.create();
 
+var initAngle = [];
+var initAngleInv = [];
+
 function main3(skyTex) {
 	skyboxRenderer.initScene(skyTex);
 
@@ -162,7 +166,11 @@ function main3(skyTex) {
 				quat.mul(glutil.view.angle, glutil.view.angle, tmpQ);
 				quat.normalize(glutil.view.angle, glutil.view.angle);
 			} else if (mouseMethod == 'rotateObject') {
+				//rotate into view space
+				quat.mul(tmpQ, tmpQ, initAngleInv);
+				quat.mul(tmpQ, initAngle, tmpQ);
 				quat.conjugate(tmpQ, tmpQ);
+
 				quat.mul(objectAngle, tmpQ, objectAngle);
 				quat.normalize(objectAngle, objectAngle);
 skyboxRenderer.resetField();
@@ -195,6 +203,8 @@ function main2() {
 	glutil.view.zFar = 100;
 	glutil.view.fovY = 90;
 	quat.mul(glutil.view.angle, /*90' x*/[SQRT_1_2,0,0,SQRT_1_2], /*90' -y*/[0,-SQRT_1_2,0,SQRT_1_2]);
+	quat.copy(initAngle, glutil.view.angle);
+	quat.conjugate(initAngleInv, initAngle);
 
 	console.log('creating skyTex');
 	var skyTex = new glutil.TextureCube({
