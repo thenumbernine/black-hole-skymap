@@ -174,9 +174,233 @@ vec4 accel(vec4 pos, vec4 vel) {
 	return -neg_accel;
 }
 */}),
-			
-				
+
+
+/*
+1 = (x^2 + y^2) / (r^2 + a^2) + z^2 / r^2
+r^4 + r^2 (a^2 - x^2 - y^2 - z^2) - a^2 z^2 = 0
+
+b = x^2 + y^2 + z^2 - a^2
+r^2 = 1/2 ( -b +- sqrt( b*b + 4 * a^2 * z^2))
+
+4 r^3 dr + 2 r dr (a^2 - x^2 - y^2 - z^2) + r^2 (-2 x dx - 2 y dy - 2 z dz) - 2 a^2 z dz = 0
+(4 r^2 + 2 (a^2 - x^2 - y^2 - z^2)) r dr - 2 r^2 x dx - 2 r^2 y dy - 2 (r^2 + a^2) z dz = 0
+
+dr/dx = r x / (2 r^2 + a^2 - x^2 - y^2 - z^2)
+dr/dy = r y / (2 r^2 + a^2 - x^2 - y^2 - z^2)
+dr/dz = (r + a^2/r) z / (2 r^2 + a^2 - x^2 - y^2 - z^2)
+r_,i = (r + delta_iz a^2 / r) / (2 r^2 + a^2 - x^2 - y^2 - z^2) x^i
+*/
+
+
 				['Kerr Black Hole'] : mlstr(function(){/*
+uniform float blackHoleMass;
+uniform float blackHoleCharge;
+uniform float blackHoleAngularMomentum;
+
+float calc_Kerr_rSq(vec3 pos) {
+	float a = blackHoleAngularMomentum / blackHoleMass;
+	float z = pos.z;
+	float b = a*a - dot(pos,pos);
+	float rSq = .5*(-b + sqrt(b*b + 4.*a*a*z*z));
+	return rSq;
+}
+
+float calc_Kerr_H(vec3 pos, float r) {
+	float rs = 2. * blackHoleMass;
+	float Q = blackHoleCharge;
+	float a = blackHoleAngularMomentum / blackHoleMass;
+	float z = pos.z;
+	float H = .5 * (r * rs - Q * Q) / (r*r + a*a*z*z/(r*r));
+	return H;
+}
+
+vec3 calc_Kerr_l(vec3 pos, float r) {
+	float a = blackHoleAngularMomentum / blackHoleMass;
+	float x = pos.x;
+	float y = pos.y;
+	float z = pos.z;
+	vec3 l = vec3(
+		(r*x + a*y)/(r*r + a*a),
+		(r*y - a*x)/(r*r + a*a),
+		z/r);
+	return l;
+}
+
+float g_tt(vec3 pos) {
+	float r = sqrt(calc_Kerr_rSq(pos));
+	float H = calc_Kerr_H(pos, r);
+	return -1. + 2. * H;
+}
+
+vec3 g_ti(vec3 pos) { 
+	float r = sqrt(calc_Kerr_rSq(pos));
+	float H = calc_Kerr_H(pos, r);
+	vec3 l = calc_Kerr_l(pos, r);
+	return 2. * H * l;
+}
+
+mat3 g_ij(vec3 pos) {
+	float r = sqrt(calc_Kerr_rSq(pos));
+	float H = calc_Kerr_H(pos, r);
+	vec3 l = calc_Kerr_l(pos, r);
+	return mat3(1.) + 2. * H * outerProduct(l,l);
+}
+
+//
+//l_t = 1
+//l_x = (r x + a y) / (r^2 + a^2)
+//l_y = (r y - a x) / (r^2 + a^2)
+//l_z = z / r
+//
+//H = .5 (r rs - Q^2) / (r^2 + a^2 z^2/r^2)
+//H,i = 
+//	(
+//		.5 r_,i rs (r^2 + a^2 z^2 / r^2) 
+//		- (r rs - Q^2) (r r_,i + a^2 (delta_zi r - z r_,i) z / r^3)
+//	) / (r^2 + a^2 z^2 / r^2)^2
+//
+//g_uv = eta_uv + 2 H l_u l_v
+//g_tt = -1 + 2 H
+//g_ti = 2 H l_i
+//g_ij = delta_ij + 2 H l_i l_j
+//
+//g^uv = eta^uv - 2 H (eta^ua l_a) (eta^vb l_b)
+//g^tt = -1 - 2 H
+//g^ti = 2 H l_i
+//g^ij = delta^ij - 2 H l_i l_j
+//
+//g_uv,w = 2 (H,w l_u l_v + H (l_u,w l_v + l_u l_v,w))
+
+vec4 accel(vec4 pos, vec4 vel) {
+#if 1
+	float t = pos.w;
+	float x = pos.x;
+	float y = pos.y;
+	float z = pos.z;
+
+	float zSq = z * z;
+	float pos_pos = dot(pos.xyz, pos.xyz);
+
+	float rs = 2. * blackHoleMass;
+	float Q = blackHoleCharge;
+	float QSq = Q * Q;
+	float a = blackHoleAngularMomentum / blackHoleMass;
+	float aSq = a*a;
+	float b = aSq - pos_pos;
+	float sqrtdiscr = sqrt(b*b + 4.*aSq*zSq);
+	float rSq = .5*(-b + sqrtdiscr);
+	float r = sqrt(rSq);
+
+	vec3 zHat = vec3(0., 0., 1.);
+	vec3 dr_dx = (pos.xyz * r + (pos.xyz + zHat) * aSq / r) / (2. * rSq + aSq - pos_pos);
+	
+	float H_denom = rSq + aSq * zSq / rSq;
+	float H = .5 * (r * rs - QSq) / H_denom;
+
+	vec4 dH_dx;
+	dH_dx.xyz = (
+			.5 * dr_dx * rs * H_denom
+			- (r * rs - QSq) * (
+				r * dr_dx + aSq * z / (r * rSq) * (zHat * r - z * dr_dx)
+			)
+		) / (H_denom * H_denom);
+
+	float aSq_plus_rSq = rSq + aSq;
+	
+	vec4 l = vec4(
+		(r*x + a*y)/aSq_plus_rSq,
+		(r*y - a*x)/aSq_plus_rSq,
+		z/r,
+		1.
+	);
+
+	vec4 lU = l;
+	lU.w = -lU.w;
+
+	mat4 gInv = mat4(
+		vec4(1., 0., 0., 0.),
+		vec4(0., 1., 0., 0.),
+		vec4(0., 0., 1., 0.),
+		vec4(0., 0., 0., -1.)
+	) - 2. * H * outerProduct(lU, lU);
+
+
+	// l_a,b == dl_dx[a][b]
+	mat4 dl_dx = mat4(
+		vec4(
+			(dr_dx[0] * (x * (aSq - rSq) - 2. * a * y * r) / aSq_plus_rSq + r) / aSq_plus_rSq,
+			(dr_dx[1]  * (x * (aSq - rSq) - 2. * a * y * r) / aSq_plus_rSq + a) / aSq_plus_rSq,
+			-dr_dx[2] * (x * (aSq - rSq) - 2. * a * y * r) / (aSq_plus_rSq * aSq_plus_rSq),
+			0.),
+		vec4(
+			(dr_dx[0] * (y * (aSq - rSq) + 2. * a * x * r) / aSq_plus_rSq - a) / aSq_plus_rSq,
+			(dr_dx[1] * (y * (aSq - rSq) + 2. * a * x * r) / aSq_plus_rSq + r) / aSq_plus_rSq,
+			dr_dx[2] * (y * (aSq - rSq) + 2. * a * x * r) / (aSq_plus_rSq * aSq_plus_rSq),
+			0.),
+		vec4(
+			-z * dr_dx[0] / rSq,
+			-z * dr_dx[1] / rSq,
+			1./r - z * dr_dx[2] / rSq,
+			0.),
+		vec4(0., 0., 0., 0.));
+	
+	// conn_abc = H,a l_b l_c + H,b l_a l_c + H,c l_a l_b
+	//		+ H (l_a (l_b,c + l_c,b) + l_b (l_a,c + l_c,a) + l_c (l_a,b + l_b,a))
+	vec4 conn_vel_vel;
+	for (int a = 0; a < 4; ++a) {
+		float sum = 0.;
+		for (int b = 0; b < 4; ++b) {
+			for (int c = 0; c < 4; ++c) {
+				float conn_lll = dH_dx[a] * l[b] * l[c]
+					+ dH_dx[b] * l[a] * l[c]
+					+ dH_dx[c] * l[a] * l[b]
+					+ H * (
+						l[a] * (dl_dx[b][c] + dl_dx[c][b])
+						+ l[b] * (dl_dx[a][c] + dl_dx[c][a])
+						+ l[c] * (dl_dx[a][b] + dl_dx[b][a])
+					);
+				sum += conn_lll * vel[b] * vel[c];
+			}
+		}
+		conn_vel_vel[a] = sum;
+	}
+	
+	// conn^a_bc = g^ad conn_dbc
+	return -gInv * conn_vel_vel;
+#endif
+	
+#if 0	//degenerate case:
+	float R = 2. * blackHoleMass;
+	
+	float inv_r = 1. / length(pos.xyz);
+	vec4 npos = pos * inv_r;	
+	vec4 nvel = vel * inv_r;
+
+	float R_r = R * inv_r;
+	float npos_nvel = dot(npos.xyz, nvel.xyz);
+	float nvel_nvel = dot(nvel.xyz, nvel.xyz);
+	
+	vec4 neg_accel;
+	neg_accel.w = R * (
+		.5 * R_r * nvel.w * nvel.w
+		+ npos_nvel * (1. + R_r) * nvel.w
+		+ npos_nvel * npos_nvel * (2. + .5 * R_r) 
+		- nvel_nvel
+	);
+	neg_accel.xyz = (R * (
+		.5 * (1. - R_r) * nvel.w * nvel.w
+		- R_r * npos_nvel * nvel.w
+		+ nvel_nvel
+		- .5 * inv_r * npos_nvel * npos_nvel * (3. - R_r)
+	)) * npos.xyz;
+	return -neg_accel;
+#endif
+}
+*/}),
+		
+				
+				['Kerr Black Hole full'] : mlstr(function(){/*
 uniform float blackHoleMass;
 uniform float blackHoleCharge;
 uniform float blackHoleAngularMomentum;
@@ -229,7 +453,6 @@ mat3 g_ij(vec3 pos) {
 	return mat3(1.) + 2. * H * outerProduct(l,l);
 }
 
-//TODO FIXME
 vec4 accel(vec4 pos, vec4 vel) {
 	float t = pos.w;
 	float x = pos.x;
@@ -336,6 +559,7 @@ vec4 accel(vec4 pos, vec4 vel) {
 	return -gInv * conn_vel_vel;
 }
 */}),
+				
 				['Alcubierre Warp Drive Bubble'] : mlstr(function(){/*
 uniform float warpBubbleThickness;
 uniform float warpBubbleVelocity;
