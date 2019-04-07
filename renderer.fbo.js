@@ -190,6 +190,7 @@ vec4 accel(metricInfo_t m, vec4 pos, vec4 vel) {
 	)) * npos.xyz;
 	return -neg_accel;
 }
+
 */}),
 
 
@@ -215,6 +216,7 @@ l_y = (r y - a x) / (r^2 + a^2)
 l_z = z / r
 
 l_t,u = 0
+l_u,t = 0
 l_x,x = ((r,x x + r) (r^2 + a^2) - (r x + a y) (2 r r,x)) / (r^2 + a^2)^2
 l_x,y = ((r,y x + a) (r^2 + a^2) - (r x + a y) (2 r r,y)) / (r^2 + a^2)^2
 l_x,z = ((r,z x    ) (r^2 + a^2) - (r x + a y) (2 r r,z)) / (r^2 + a^2)^2
@@ -226,11 +228,11 @@ l_z,y = -z r,y / r^2
 l_z,z = (r - z r,z) / r^2
 
 
-H = .5 (r rs - Q^2) / (r^2 + a^2 z^2/r^2)
+H = .5 (r R - Q^2) / (r^2 + a^2 z^2/r^2)
 H_,t = 0
 H_,i = (
-		.5 r_,i rs (r^2 + a^2 z^2 / r^2) 
-		- (r rs - Q^2) (r r_,i + a^2 (delta_zi r - z r_,i) z / r^3)
+		.5 r_,i R (r^2 + a^2 z^2 / r^2) 
+		- (r R - Q^2) (r r_,i + a^2 (delta_zi r - z r_,i) z / r^3)
 	) / (r^2 + a^2 z^2 / r^2)^2
 
 g_uv = eta_uv + 2 H l_u l_v
@@ -260,7 +262,6 @@ Conn_uvw = 1/2 (g_uv,w + g_uw,v - g_wv,u)
 			+ l_w (l_u,v - l_v,u)
 		)
 
-Conn_ttt = 
 */
 
 
@@ -280,15 +281,16 @@ struct metricInfo_t {
 metricInfo_t init_metricInfo(vec4 pos) {
 	metricInfo_t m;
 	m.pos = pos;
-	float rs = 2. * blackHoleMass;
+	float R = 2. * blackHoleMass;
 	float a = blackHoleAngularMomentum / blackHoleMass;
 	float aSq = a * a;
 	float Q = blackHoleCharge;
+	float QSq = Q * Q;
 	float zSq = pos.z * pos.z;
 	float b = aSq - dot(pos.xyz, pos.xyz);
 	m.rSq = .5 * (-b + sqrt(b * b + 4. * aSq * zSq));
 	m.r = sqrt(m.rSq);
-	m.H = .5 * (m.r * rs - Q * Q) / (m.rSq + aSq * zSq / m.rSq);
+	m.H = .5 * (m.r * R - QSq) / (m.rSq + aSq * zSq / m.rSq);
 	m.l = vec3(
 		(m.r * pos.x + a * pos.y) / (m.rSq + aSq),
 		(m.r * pos.y - a * pos.x) / (m.rSq + aSq),
@@ -318,7 +320,7 @@ vec4 accel(metricInfo_t m, vec4 pos, vec4 vel) {
 	float zSq = z * z;
 	float pos_pos = dot(pos.xyz, pos.xyz);
 
-	float rs = 2. * blackHoleMass;
+	float R = 2. * blackHoleMass;
 	float Q = blackHoleCharge;
 	float QSq = Q * Q;
 	float a = blackHoleAngularMomentum / blackHoleMass;
@@ -338,8 +340,8 @@ vec4 accel(metricInfo_t m, vec4 pos, vec4 vel) {
 
 	vec4 dH_dx;
 	dH_dx.xyz = (
-			.5 * dr_dx * rs * H_denom
-			- (r * rs - QSq) * (
+			.5 * dr_dx * R * H_denom
+			- (r * R - QSq) * (
 				r * dr_dx + aSq * z / (r * rSq) * (zHat * r - z * dr_dx)
 			)
 		) / (H_denom * H_denom);
@@ -365,6 +367,7 @@ vec4 accel(metricInfo_t m, vec4 pos, vec4 vel) {
 
 	// conn_abc = H,a l_b l_c + H,b l_a l_c + H,c l_a l_b
 	//		+ H (l_a (l_b,c + l_c,b) + l_b (l_a,c + l_c,a) + l_c (l_a,b + l_b,a))
+	
 	vec4 conn_vel_vel;
 	for (int a = 0; a < 4; ++a) {
 		float sum = 0.;
@@ -375,8 +378,8 @@ vec4 accel(metricInfo_t m, vec4 pos, vec4 vel) {
 					+ dH_dx[c] * l[a] * l[b]
 					+ H * (
 						l[a] * (dl_dx[b][c] + dl_dx[c][b])
-						+ l[b] * (dl_dx[a][c] + dl_dx[c][a])
-						+ l[c] * (dl_dx[a][b] + dl_dx[b][a])
+						+ l[b] * (dl_dx[a][c] - dl_dx[c][a])
+						+ l[c] * (dl_dx[a][b] - dl_dx[b][a])
 					);
 				sum += conn_lll * vel[b] * vel[c];
 			}
@@ -445,20 +448,20 @@ metricInfo_t init_metricInfo(vec4 pos) {
 
 float g_tt(metricInfo_t m) {
 	vec3 pos = m.pos;
-	float rs = 2. * blackHoleMass;
+	float R = 2. * blackHoleMass;
 	float Q = blackHoleCharge;
 	float a = blackHoleAngularMomentum / blackHoleMass;
 	float z = pos.z;
 	float b = a*a - dot(pos,pos);
 	float rSq = .5*(-b + sqrt(b*b + 4.*a*a*z*z));
 	float r = sqrt(rSq);
-	float H = .5 * (r * rs - Q * Q) / (rSq + a*a*z*z/rSq);
+	float H = .5 * (r * R - Q * Q) / (rSq + a*a*z*z/rSq);
 	return -1. + 2. * H;
 }
 
 vec3 g_ti(metricInfo_t m) { 
 	vec3 pos = m.pos;
-	float rs = 2. * blackHoleMass;
+	float R = 2. * blackHoleMass;
 	float Q = blackHoleCharge;
 	float a = blackHoleAngularMomentum / blackHoleMass;
 	float x = pos.x;
@@ -467,7 +470,7 @@ vec3 g_ti(metricInfo_t m) {
 	float b = a*a - dot(pos,pos);
 	float rSq = .5*(-b + sqrt(b*b + 4.*a*a*z*z));
 	float r = sqrt(rSq);
-	float H = .5 * (r * rs - Q * Q) / (rSq + a*a*z*z/rSq);
+	float H = .5 * (r * R - Q * Q) / (rSq + a*a*z*z/rSq);
 	vec3 l = vec3(
 		(r*x + a*y)/(rSq + a*a),
 		(r*y - a*x)/(rSq + a*a),
@@ -477,7 +480,7 @@ vec3 g_ti(metricInfo_t m) {
 
 mat3 g_ij(metricInfo_t m) {
 	vec3 pos = m.pos;
-	float rs = 2. * blackHoleMass;
+	float R = 2. * blackHoleMass;
 	float Q = blackHoleCharge;
 	float a = blackHoleAngularMomentum / blackHoleMass;
 	float x = pos.x;
@@ -486,7 +489,7 @@ mat3 g_ij(metricInfo_t m) {
 	float b = a*a - dot(pos,pos);
 	float rSq = .5*(-b + sqrt(b*b + 4.*a*a*z*z));
 	float r = sqrt(rSq);
-	float H = .5 * (r * rs - Q * Q) / (rSq + a*a*z*z/rSq);
+	float H = .5 * (r * R - Q * Q) / (rSq + a*a*z*z/rSq);
 	vec3 l = vec3(
 		(r*x + a*y)/(rSq + a*a),
 		(r*y - a*x)/(rSq + a*a),
@@ -500,7 +503,7 @@ vec4 accel(metricInfo_t m, vec4 pos, vec4 vel) {
 	float y = pos.y;
 	float z = pos.z;
 
-	float rs = 2. * blackHoleMass;
+	float R = 2. * blackHoleMass;
 	float Q = blackHoleCharge;
 	float a = blackHoleAngularMomentum / blackHoleMass;
 	float aSq = a*a;
@@ -508,7 +511,7 @@ vec4 accel(metricInfo_t m, vec4 pos, vec4 vel) {
 	float sqrtdiscr = sqrt(b*b + 4.*aSq*z*z);
 	float rSq = .5*(-b + sqrtdiscr);
 	float r = sqrt(rSq);
-	float H = .5 * (r * rs - Q * Q) / (rSq + aSq*z*z/rSq);
+	float H = .5 * (r * R - Q * Q) / (rSq + aSq*z*z/rSq);
 
 	vec3 db_dxis = -2. * pos.xyz;
 	vec3 dr_dxis;
@@ -525,8 +528,8 @@ vec4 accel(metricInfo_t m, vec4 pos, vec4 vel) {
 	dH_dx.w = 0.;
 	for (int i = 0; i < 3; ++i) {
 		dH_dx[i] = .5 * (
-			dr_dxis[i] * rs * (rSq + aSq*z*z / rSq)
-			- (r * rs - Q*Q) * (
+			dr_dxis[i] * R * (rSq + aSq*z*z / rSq)
+			- (r * R - Q*Q) * (
 				2. * r * dr_dxis[i]
 				+ aSq*(
 					(i == 2 ? (2. * z / rSq) : 0.)
