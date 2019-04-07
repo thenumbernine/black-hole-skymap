@@ -373,7 +373,8 @@ vec4 accel(metricInfo_t m, vec4 pos, vec4 vel) {
 		float sum = 0.;
 		for (int b = 0; b < 4; ++b) {
 			for (int c = 0; c < 4; ++c) {
-				float conn_lll = dH_dx[a] * l[b] * l[c]
+				float conn_lll = 
+					- dH_dx[a] * l[b] * l[c]
 					+ dH_dx[b] * l[a] * l[c]
 					+ dH_dx[c] * l[a] * l[b]
 					+ H * (
