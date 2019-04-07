@@ -198,7 +198,7 @@ vec4 accel(metricInfo_t m, vec4 pos, vec4 vel) {
 1 = (x^2 + y^2) / (r^2 + a^2) + z^2 / r^2
 r^4 + r^2 (a^2 - x^2 - y^2 - z^2) - a^2 z^2 = 0
 
-b = x^2 + y^2 + z^2 - a^2
+b = a^2 - x^2 - y^2 - z^2
 r^2 = 1/2 ( -b +- sqrt( b*b + 4 * a^2 * z^2))
 
 4 r^3 dr + 2 r dr (a^2 - x^2 - y^2 - z^2) + r^2 (-2 x dx - 2 y dy - 2 z dz) - 2 a^2 z dz = 0
@@ -206,9 +206,8 @@ r^2 = 1/2 ( -b +- sqrt( b*b + 4 * a^2 * z^2))
 
 dr/dx = r x / (2 r^2 + a^2 - x^2 - y^2 - z^2)
 dr/dy = r y / (2 r^2 + a^2 - x^2 - y^2 - z^2)
-dr/dz = (r + a^2/r) z / (2 r^2 + a^2 - x^2 - y^2 - z^2)
+dr/dz = (r^2 + a^2) z/r / (2 r^2 + a^2 - x^2 - y^2 - z^2)
 r_,i = (r + delta_iz a^2 / r) / (2 r^2 + a^2 - x^2 - y^2 - z^2) x^i
-
 
 l_t = 1
 l_x = (r x + a y) / (r^2 + a^2)
@@ -262,6 +261,11 @@ Conn_uvw = 1/2 (g_uv,w + g_uw,v - g_wv,u)
 			+ l_w (l_u,v - l_v,u)
 		)
 
+Conn_uvw u^v u^w
+	= 	  2 l_u (l_v u^v) (H,w u^w)
+		+ 2 l_u H (l_v,w u^v u^w)
+		- H,u (l_v u^v)^2
+		+ 2 H u^w l_v u^v (l_u,w - l_w,u)
 */
 
 
@@ -310,14 +314,30 @@ mat3 g_ij(metricInfo_t m) {
 	return mat3(1.) + 2. * m.H * outerProduct(m.l, m.l);
 }
 
+mat4 transpose(mat4 m) {
+	mat4 r;
+	r[0][0] = m[0][0];
+	r[1][0] = m[0][1];
+	r[2][0] = m[0][2];
+	r[3][0] = m[0][3];
+	r[0][1] = m[1][0];
+	r[1][1] = m[1][1];
+	r[2][1] = m[1][2];
+	r[3][1] = m[1][3];
+	r[0][2] = m[2][0];
+	r[1][2] = m[2][1];
+	r[2][2] = m[2][2];
+	r[3][2] = m[2][3];
+	r[0][3] = m[3][0];
+	r[1][3] = m[3][1];
+	r[2][3] = m[3][2];
+	r[3][3] = m[3][3];
+	return r;
+}
+
 vec4 accel(metricInfo_t m, vec4 pos, vec4 vel) {
 #if 1
-	float t = pos.w;
-	float x = pos.x;
-	float y = pos.y;
-	float z = pos.z;
-
-	float zSq = z * z;
+	float zSq = pos.z * pos.z;
 	float pos_pos = dot(pos.xyz, pos.xyz);
 
 	float R = 2. * blackHoleMass;
@@ -329,11 +349,10 @@ vec4 accel(metricInfo_t m, vec4 pos, vec4 vel) {
 	float rSq = m.rSq;
 	float r = m.r;
 	
+	float aSq_plus_rSq = rSq + aSq;
+	
 	vec3 zHat = vec3(0., 0., 1.);
-	vec3 dr_dx = (
-			pos.xyz * r 
-			+ (pos.xyz + zHat) * aSq / r
-		) / (2. * rSq + aSq - pos_pos);
+	vec3 dr_dx = (pos.xyz * aSq_plus_rSq + zHat * aSq) / (r * (2. * rSq + aSq - pos_pos));
 	
 	float H_denom = rSq + aSq * zSq / rSq;
 	float H = m.H;
@@ -342,52 +361,38 @@ vec4 accel(metricInfo_t m, vec4 pos, vec4 vel) {
 	dH_dx.xyz = (
 			.5 * dr_dx * R * H_denom
 			- (r * R - QSq) * (
-				r * dr_dx + aSq * z / (r * rSq) * (zHat * r - z * dr_dx)
+				r * dr_dx + aSq * pos.z / (r * rSq) * (zHat * r - pos.z * dr_dx)
 			)
 		) / (H_denom * H_denom);
 
-	float aSq_plus_rSq = rSq + aSq;
 	float aSq_plus_rSq_sq = aSq_plus_rSq * aSq_plus_rSq;  
 	
 
 	// l_a,b == dl_dx[a][b]
 	mat4 dl_dx;
-	dl_dx[0][0] = ((dr_dx.x * x + r) * aSq_plus_rSq - (r * x + a * y) * (2. * r * dr_dx.x)) / aSq_plus_rSq_sq;
-	dl_dx[0][1] = ((dr_dx.y * x + a) * aSq_plus_rSq - (r * x + a * y) * (2. * r * dr_dx.y)) / aSq_plus_rSq_sq;
-	dl_dx[0][2] = ((dr_dx.z * x    ) * aSq_plus_rSq - (r * x + a * y) * (2. * r * dr_dx.z)) / aSq_plus_rSq_sq;
-	dl_dx[1][0] = ((dr_dx.x * y - a) * aSq_plus_rSq - (r * y - a * x) * (2. * r * dr_dx.x)) / aSq_plus_rSq_sq;
-	dl_dx[1][1] = ((dr_dx.y * y + r) * aSq_plus_rSq - (r * y - a * x) * (2. * r * dr_dx.y)) / aSq_plus_rSq_sq;
-	dl_dx[1][2] = ((dr_dx.z * y    ) * aSq_plus_rSq - (r * y - a * x) * (2. * r * dr_dx.z)) / aSq_plus_rSq_sq;
-	dl_dx[2][0] = -z * dr_dx.x / rSq;
-	dl_dx[2][1] = -z * dr_dx.y / rSq;
-	dl_dx[2][2] = (r - z * dr_dx.z) / rSq;
+	dl_dx[0][0] = ((dr_dx.x * pos.x + r) * aSq_plus_rSq - (r * pos.x + a * pos.y) * (2. * r * dr_dx.x)) / aSq_plus_rSq_sq;
+	dl_dx[0][1] = ((dr_dx.y * pos.x + a) * aSq_plus_rSq - (r * pos.x + a * pos.y) * (2. * r * dr_dx.y)) / aSq_plus_rSq_sq;
+	dl_dx[0][2] = ((dr_dx.z * pos.x    ) * aSq_plus_rSq - (r * pos.x + a * pos.y) * (2. * r * dr_dx.z)) / aSq_plus_rSq_sq;
+	dl_dx[1][0] = ((dr_dx.x * pos.y - a) * aSq_plus_rSq - (r * pos.y - a * pos.x) * (2. * r * dr_dx.x)) / aSq_plus_rSq_sq;
+	dl_dx[1][1] = ((dr_dx.y * pos.y + r) * aSq_plus_rSq - (r * pos.y - a * pos.x) * (2. * r * dr_dx.y)) / aSq_plus_rSq_sq;
+	dl_dx[1][2] = ((dr_dx.z * pos.y    ) * aSq_plus_rSq - (r * pos.y - a * pos.x) * (2. * r * dr_dx.z)) / aSq_plus_rSq_sq;
+	dl_dx[2][0] = -pos.z * dr_dx.x / rSq;
+	dl_dx[2][1] = -pos.z * dr_dx.y / rSq;
+	dl_dx[2][2] = (r - pos.z * dr_dx.z) / rSq;
 
+	vec4 dl_dx_vel = dl_dx * vel;
+	float vel_dl_dx_vel = dot(dl_dx_vel, vel);
 	
 	vec4 l = vec4(m.l, 1.);
-
-	// conn_abc = H,a l_b l_c + H,b l_a l_c + H,c l_a l_b
-	//		+ H (l_a (l_b,c + l_c,b) + l_b (l_a,c + l_c,a) + l_c (l_a,b + l_b,a))
-	
-	vec4 conn_vel_vel;
-	for (int a = 0; a < 4; ++a) {
-		float sum = 0.;
-		for (int b = 0; b < 4; ++b) {
-			for (int c = 0; c < 4; ++c) {
-				float conn_lll = 
-					- dH_dx[a] * l[b] * l[c]
-					+ dH_dx[b] * l[a] * l[c]
-					+ dH_dx[c] * l[a] * l[b]
-					+ H * (
-						l[a] * (dl_dx[b][c] + dl_dx[c][b])
-						+ l[b] * (dl_dx[a][c] - dl_dx[c][a])
-						+ l[c] * (dl_dx[a][b] - dl_dx[b][a])
-					);
-				sum += conn_lll * vel[b] * vel[c];
-			}
-		}
-		conn_vel_vel[a] = sum;
-	}
-
+	float l_dot_vel = dot(l, vel);
+	float dH_dx_dot_vel = dot(dH_dx, vel);
+	vec4 conn_vel_vel = 
+		l * 2. * (
+			l_dot_vel * dH_dx_dot_vel
+			+ H * vel_dl_dx_vel
+		)
+		- dH_dx * l_dot_vel * l_dot_vel
+		+ 2. * H * ( dl_dx - transpose(dl_dx) ) * vel * l_dot_vel;
 	
 	vec4 lU = vec4(m.l, -1.);
 	
@@ -499,7 +504,6 @@ mat3 g_ij(metricInfo_t m) {
 }
 
 vec4 accel(metricInfo_t m, vec4 pos, vec4 vel) {
-	float t = pos.w;
 	float x = pos.x;
 	float y = pos.y;
 	float z = pos.z;
