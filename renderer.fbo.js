@@ -27,7 +27,8 @@ GeodesicFBORenderer = makeClass({
 				'warpBubbleVelocity', 
 				'objectDist', 
 				'objectAngle', 
-				'deltaLambda'
+				'deltaLambda',
+				'simTime'
 			];
 			
 			channel.texs = [];
@@ -134,7 +135,7 @@ vec4 accel(metricInfo_t m, vec4 pos, vec4 vel) {
 				['Kerr Black Hole degeneracy'] : mlstr(function(){/*
 uniform float blackHoleMass;
 uniform float blackHoleCharge;
-uniform float blackHoleAngularMomentum;
+uniform float blackHoleAngularVelocity;
 
 struct metricInfo_t {
 	vec3 pos;
@@ -272,7 +273,7 @@ Conn_uvw u^v u^w
 				['Kerr Black Hole'] : mlstr(function(){/*
 uniform float blackHoleMass;
 uniform float blackHoleCharge;
-uniform float blackHoleAngularMomentum;
+uniform float blackHoleAngularVelocity;
 
 struct metricInfo_t {
 	vec4 pos;
@@ -286,7 +287,7 @@ metricInfo_t init_metricInfo(vec4 pos) {
 	metricInfo_t m;
 	m.pos = pos;
 	float R = 2. * blackHoleMass;
-	float a = blackHoleAngularMomentum / blackHoleMass;
+	float a = blackHoleAngularVelocity;
 	float aSq = a * a;
 	float Q = blackHoleCharge;
 	float QSq = Q * Q;
@@ -336,14 +337,13 @@ mat4 transpose(mat4 m) {
 }
 
 vec4 accel(metricInfo_t m, vec4 pos, vec4 vel) {
-#if 1
 	float zSq = pos.z * pos.z;
 	float pos_pos = dot(pos.xyz, pos.xyz);
 
 	float R = 2. * blackHoleMass;
 	float Q = blackHoleCharge;
 	float QSq = Q * Q;
-	float a = blackHoleAngularMomentum / blackHoleMass;
+	float a = blackHoleAngularVelocity;
 	float aSq = a * a;
 	
 	float rSq = m.rSq;
@@ -392,7 +392,7 @@ vec4 accel(metricInfo_t m, vec4 pos, vec4 vel) {
 			+ H * vel_dl_dx_vel
 		)
 		- dH_dx * l_dot_vel * l_dot_vel
-		+ 2. * H * ( dl_dx - transpose(dl_dx) ) * vel * l_dot_vel;
+		+ 2. * H * (dl_dx - transpose(dl_dx)) * vel * l_dot_vel;
 	
 	vec4 lU = vec4(m.l, -1.);
 	
@@ -405,34 +405,6 @@ vec4 accel(metricInfo_t m, vec4 pos, vec4 vel) {
 
 	// conn^a_bc = g^ad conn_dbc
 	return -gInv * conn_vel_vel;
-#endif
-	
-#if 0	//degenerate case:
-	float R = 2. * blackHoleMass;
-	
-	float inv_r = 1. / length(pos.xyz);
-	vec4 npos = pos * inv_r;	
-	vec4 nvel = vel * inv_r;
-
-	float R_r = R * inv_r;
-	float npos_nvel = dot(npos.xyz, nvel.xyz);
-	float nvel_nvel = dot(nvel.xyz, nvel.xyz);
-	
-	vec4 neg_accel;
-	neg_accel.w = R * (
-		.5 * R_r * nvel.w * nvel.w
-		+ npos_nvel * (1. + R_r) * nvel.w
-		+ npos_nvel * npos_nvel * (2. + .5 * R_r) 
-		- nvel_nvel
-	);
-	neg_accel.xyz = (R * (
-		.5 * (1. - R_r) * nvel.w * nvel.w
-		- R_r * npos_nvel * nvel.w
-		+ nvel_nvel
-		- .5 * inv_r * npos_nvel * npos_nvel * (3. - R_r)
-	)) * npos.xyz;
-	return -neg_accel;
-#endif
 }
 */}),
 		
@@ -440,7 +412,7 @@ vec4 accel(metricInfo_t m, vec4 pos, vec4 vel) {
 				['Kerr Black Hole full'] : mlstr(function(){/*
 uniform float blackHoleMass;
 uniform float blackHoleCharge;
-uniform float blackHoleAngularMomentum;
+uniform float blackHoleAngularVelocity;
 
 struct metricInfo_t {
 	vec3 pos;
@@ -456,7 +428,7 @@ float g_tt(metricInfo_t m) {
 	vec3 pos = m.pos;
 	float R = 2. * blackHoleMass;
 	float Q = blackHoleCharge;
-	float a = blackHoleAngularMomentum / blackHoleMass;
+	float a = blackHoleAngularVelocity;
 	float z = pos.z;
 	float b = a*a - dot(pos,pos);
 	float rSq = .5*(-b + sqrt(b*b + 4.*a*a*z*z));
@@ -469,7 +441,7 @@ vec3 g_ti(metricInfo_t m) {
 	vec3 pos = m.pos;
 	float R = 2. * blackHoleMass;
 	float Q = blackHoleCharge;
-	float a = blackHoleAngularMomentum / blackHoleMass;
+	float a = blackHoleAngularVelocity;
 	float x = pos.x;
 	float y = pos.y;
 	float z = pos.z;
@@ -488,7 +460,7 @@ mat3 g_ij(metricInfo_t m) {
 	vec3 pos = m.pos;
 	float R = 2. * blackHoleMass;
 	float Q = blackHoleCharge;
-	float a = blackHoleAngularMomentum / blackHoleMass;
+	float a = blackHoleAngularVelocity;
 	float x = pos.x;
 	float y = pos.y;
 	float z = pos.z;
@@ -510,7 +482,7 @@ vec4 accel(metricInfo_t m, vec4 pos, vec4 vel) {
 
 	float R = 2. * blackHoleMass;
 	float Q = blackHoleCharge;
-	float a = blackHoleAngularMomentum / blackHoleMass;
+	float a = blackHoleAngularVelocity;
 	float aSq = a*a;
 	float b = aSq - dot(pos.xyz, pos.xyz);
 	float sqrtdiscr = sqrt(b*b + 4.*aSq*z*z);
@@ -716,7 +688,7 @@ void main() {
 varying vec3 vtxv;
 void main() {
 	gl_FragColor = vec4(-objectDist, 0., 0., 0.);
-	gl_FragColor.xyz = quatRotate(objectAngle, gl_FragColor.xyz);
+	gl_FragColor.xyz = quatRotate(quatConj(objectAngle), gl_FragColor.xyz);
 }
 */}));
 						} else if (pos_or_vel == 'vel') {
@@ -744,10 +716,10 @@ float reset_w(vec4 pos, vec4 vel) {
 varying vec3 vtxv;
 void main() {
 	vec4 pos = vec4(-objectDist, 0., 0., 0.);
-	pos.xyz = quatRotate(objectAngle, pos.xyz);
+	pos.xyz = quatRotate(quatConj(objectAngle), pos.xyz);
 	
 	vec4 vel = vec4(normalize(vtxv.xyz), 0.);
-	vel.xyz = quatRotate(objectAngle, vel.xyz);
+	vel.xyz = quatRotate(quatConj(objectAngle), vel.xyz);
 	
 	gl_FragColor.xyz = vel.xyz;
 	gl_FragColor.w = reset_w(pos, vel);
@@ -826,9 +798,7 @@ void main() {
 			});
 		});
 
-		var cubeShader = new this.glutil.ShaderProgram({
-			vertexPrecision : 'best',
-			vertexCode : shaderCommonCode + mlstr(function(){/*
+		var cubeVertexCode = shaderCommonCode + mlstr(function(){/*
 attribute vec2 vertex;
 varying vec2 uv;
 uniform mat4 projMat;
@@ -847,11 +817,19 @@ void main() {
 	vec4 vtx4 = vec4(vtx3, 1.);
 	gl_Position = projMat * vtx4;
 }
-*/}),
-			fragmentPrecision : 'best',
-			fragmentCode : shaderCommonCode + mlstr(function(){/*
+*/});
+
+		var cubeShaderUniforms = {
+			skyTex : 0,
+			lightPosTex : 1,
+			lightVelTex : 2,
+			hsvTex : 3
+		};
+
+		var cubeFragmentHeader = shaderCommonCode + mlstr(function(){/*
 varying vec2 uv;
 uniform samplerCube skyTex;
+uniform sampler2D lightPosTex;
 uniform sampler2D lightVelTex;
 uniform vec4 viewAngle;
 
@@ -859,20 +837,93 @@ const mat3 viewMatrixInv = mat3(
 	0., 1., 0.,
 	0., 0., -1.,
 	-1., 0., 0.);
+*/});
 
+		cubeBackgroundShader = new this.glutil.ShaderProgram({
+			vertexPrecision : 'best',
+			fragmentPrecision : 'best',
+			uniforms : cubeShaderUniforms,
+			vertexCode : cubeVertexCode,
+			fragmentCode : cubeFragmentHeader + mlstr(function(){/*
 void main() {
 	vec3 dir = texture2D(lightVelTex, uv).xyz;
 	dir = viewMatrixInv * viewMatrixInv * dir;
 	dir = quatRotate(viewAngle, dir);
-	gl_FragColor.xyz = textureCube(skyTex, dir).xyz;
-	gl_FragColor.w = 1.; 
+	gl_FragColor = vec4(textureCube(skyTex, dir).xyz, 1.);
 }
-*/}),
-			uniforms : {
-				skyTex : 0,
-				lightVelTex : 1
-			}
+*/})
 		});
+		
+		cubePosXYZShader = new this.glutil.ShaderProgram({
+			vertexPrecision : 'best',
+			fragmentPrecision : 'best',
+			uniforms : cubeShaderUniforms,
+			vertexCode : cubeVertexCode,
+			fragmentCode : cubeFragmentHeader + mlstr(function(){/*
+void main() {
+	vec3 pos = texture2D(lightPosTex, uv).xyz;
+	pos = normalize(pos);
+	pos = viewMatrixInv * viewMatrixInv * pos;
+	pos = quatRotate(viewAngle, pos);
+	gl_FragColor = vec4(.5 + .5 * pos.xyz, 1.);
+}
+*/})
+		});
+
+		cubeVelXYZShader = new this.glutil.ShaderProgram({
+			vertexPrecision : 'best',
+			fragmentPrecision : 'best',
+			uniforms : cubeShaderUniforms,
+			vertexCode : cubeVertexCode,
+			fragmentCode : cubeFragmentHeader + mlstr(function(){/*
+void main() {
+	vec3 dir = texture2D(lightVelTex, uv).xyz;
+	dir = normalize(dir);
+	dir = viewMatrixInv * viewMatrixInv * dir;
+	dir = quatRotate(viewAngle, dir);
+	gl_FragColor = vec4(.5 + .5 * dir, 1.);
+}
+*/})
+		});
+
+
+		cubePosTShader = new this.glutil.ShaderProgram({
+			vertexPrecision : 'best',
+			fragmentPrecision : 'best',
+			uniforms : cubeShaderUniforms,
+			vertexCode : cubeVertexCode,
+			fragmentCode : cubeFragmentHeader + mlstr(function(){/*
+uniform float simTime;	//lambda
+uniform sampler2D hsvTex;
+void main() {
+	vec4 pos = texture2D(lightPosTex, uv);
+	float t = pos.w;
+	float ratio = t / simTime;	//global time / local time
+	float r = .5 * log(ratio);
+	gl_FragColor = texture2D(hsvTex, vec2(r, .5));
+}
+*/})
+		});
+
+		cubeVelTShader = new this.glutil.ShaderProgram({
+			vertexPrecision : 'best',
+			fragmentPrecision : 'best',
+			uniforms : cubeShaderUniforms,
+			vertexCode : cubeVertexCode,
+			fragmentCode : cubeFragmentHeader + mlstr(function(){/*
+uniform sampler2D hsvTex;
+void main() {
+	vec4 vel = texture2D(lightVelTex, uv);
+	// TODO divide by the original vel.w, which is g_tt of the initial position ...
+	float vt = vel.w;
+	float r = .5 * log(vt);
+	gl_FragColor = texture2D(hsvTex, vec2(r, .5));
+}
+*/})
+		});
+
+
+
 
 		//scene graph, 6 quads oriented in a cube
 		//I would use a cubemap but the Mali-400 doesn't seem to want to use them as 2D FBO targets ...
@@ -888,13 +939,19 @@ void main() {
 					viewAngle : this.glutil.view.angle,
 					angle : angleForSide[side]
 				},
-				shader : cubeShader,
-				texs : [skyTex, this.lightPosVelChannels[1].texs[0][side]],
+				shader : cubeBackgroundShader,
+				texs : [
+					skyTex,
+					this.lightPosVelChannels[0].texs[0][side],
+					this.lightPosVelChannels[1].texs[0][side],
+					hsvTex
+				],
 			});
 		}
 	},
 
 	resetField : function() {
+		simTime = 0;
 		gl.viewport(0, 0, this.lightTexWidth, this.lightTexHeight);
 		$.each(this.lightPosVelChannels, function(_,channel) {
 			for (var side = 0; side < 6; ++side) {
@@ -977,6 +1034,7 @@ void main() {
 	update : function() {
 		if (skyboxRenderer.runSimulation) {
 			this.updateLightPosTex();
+			simTime += deltaLambda;
 		}
 		
 		//turn on magnification filter
@@ -991,7 +1049,29 @@ void main() {
 		
 		for (var side = 0; side < 6; ++side) {
 			//texs[0] is skyTex
-			this.cubeSides[side].texs[1] = this.lightPosVelChannels[1].texs[0][side];
+			this.cubeSides[side].texs[1] = this.lightPosVelChannels[0].texs[0][side];
+			this.cubeSides[side].texs[2] = this.lightPosVelChannels[1].texs[0][side];
+			//texs[3] is hsvTex
+		}
+
+		//if we are drawing the background (skytex lookup) ...
+		var shader;
+		if (drawMethod == 'background') {
+			shader = cubeBackgroundShader;
+		} else if (drawMethod == 'pos_xyz') {
+			shader = cubePosXYZShader;
+		} else if (drawMethod == 'vel_xyz') {
+			shader = cubeVelXYZShader;
+		} else if (drawMethod == 'pos_t') {
+			shader = cubePosTShader;
+		} else if (drawMethod == 'vel_t') {
+			shader = cubeVelTShader;
+		}
+		for (var side = 0; side < 6; ++side) {
+			this.cubeSides[side].shader = shader;
+			
+			//the only dynamic variable
+			this.cubeSides[side].uniforms.simTime = simTime;
 		}
 
 		this.glutil.draw();	

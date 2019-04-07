@@ -12,6 +12,7 @@
 		<script type='text/javascript' src='/js/util.js'></script>
 		<script type='text/javascript' src='/js/gl-matrix.2.2.0.min.js'></script>
 		<script type='text/javascript' src='/js/gl-util.js'></script>
+		<script type='text/javascript' src='../js/gl-util-gradient.js'></script>
 		<script type='text/javascript' src='/js/gl-util-unitquad.js'></script>
 		<script type='text/javascript' src='/js/gl-util-kernel.js'></script>
 		<script type='text/javascript' src='/js/mouse3d.js'></script>
@@ -60,13 +61,23 @@ _gaq.push(['_trackPageview']);
 				Warp Bubble Velocity (c): <input id='warpBubbleVelocity'/><br>
 				Warp Bubble Radius: <input id='warpBubbleRadius'/><br>
 			</div>
-	
-			<input type='radio' name='mouseMethod' id='mouseMethod_rotateCamera' value='rotateCamera' checked=1/> rotate background<br>
-			<input type='radio' name='mouseMethod' id='mouseMethod_rotateObject' value='rotateObject'/> rotate view<br>
+			<hr>
 			
+			<input type='radio' name='mouseMethod' value='rotateCamera' checked=1/> rotate background<br>
+			<input type='radio' name='mouseMethod' value='rotateObject'/> rotate view<br>
+			<hr>
+
+			<input type='radio' name='drawMethod' value='background' checked=1/> show background<br>
+			<input type='radio' name='drawMethod' value='pos_xyz'/> show position<br>
+			<input type='radio' name='drawMethod' value='pos_t'/> show time ratio<br>
+			<input type='radio' name='drawMethod' value='vel_xyz'/> show velocity<br>
+			<input type='radio' name='drawMethod' value='vel_t'/> show time dilation<br>
+			<hr>
+
 			<input type='checkbox' id='runSimulation' name='runSimulation' checked=1/> simulate<br>
-			
+
 			<button id='reset'>reset field</button><br>
+			<button id='reset_view'>reset view</button><br>
 		</div>
 			
 		<div id='info' style='display:none; overflow:scroll; top:32px; z-index:1; position:absolute; background-color:rgba(255,255,255,.85); color:black; padding:10px'>

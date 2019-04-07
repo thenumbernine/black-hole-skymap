@@ -20,6 +20,7 @@ var warpBubbleVelocity = 1.5;
 var warpBubbleRadius = 1;
 
 var deltaLambda = 1;	//ray forward iteration
+var simTime = 0;
 
 var ident4 = mat4.create();
 
@@ -141,6 +142,9 @@ function update() {
 
 var mouseMethod = 'rotateCamera';
 //var mouseMethod = 'rotateObject';
+
+var drawMethod = 'background';
+
 var mouse;
 
 var objectAngle = quat.create();
@@ -151,9 +155,8 @@ var initAngleInv = [];
 function main3(skyTex) {
 	skyboxRenderer.initScene(skyTex);
 
-
-	$('#mouseMethod_rotateCamera').click(function() { mouseMethod = 'rotateCamera'; });
-	$('#mouseMethod_rotateObject').click(function() { mouseMethod = 'rotateObject'; });
+	$('input[name="mouseMethod"]').click(function() { window[$(this).attr('name')] = $(this).val(); });
+	$('input[name="drawMethod"]').click(function() { window[$(this).attr('name')] = $(this).val(); });
 
 	var tmpQ = quat.create();	
 	mouse = new Mouse3D({
@@ -342,8 +345,19 @@ function main1() {
 	$('#menu').show();
 	
 	glMaxCubeMapTextureSize = gl.getParameter(gl.MAX_CUBE_MAP_TEXTURE_SIZE);
+	
+	hsvTex = new glutil.HSVTexture(256);
+	hsvTex.bind();
+	gl.texParameteri(hsvTex.target, gl.TEXTURE_WRAP_S, gl.REPEAT);
+	hsvTex.unbind();
 
 	$('#reset').click(function() {
+		skyboxRenderer.resetField();
+	});
+
+	$('#reset_view').click(function() {
+		quat.copy(objectAngle, quat.create());
+		quat.copy(glutil.view.angle, initAngle);
 		skyboxRenderer.resetField();
 	});
 
