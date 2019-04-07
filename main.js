@@ -182,6 +182,12 @@ skyboxRenderer.resetField();
 			glutil.updateProjection();
 		}
 	});
+	
+	
+	$('#runSimulation').click(function() {
+		skyboxRenderer.runSimulation = $('#runSimulation').is(':checked');
+	});
+	skyboxRenderer.runSimulation = $('#runSimulation').is(':checked');
 
 	skyboxRenderer.resetField();
 

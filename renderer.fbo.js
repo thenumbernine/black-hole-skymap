@@ -930,8 +930,12 @@ void main() {
 		});
 	},
 
+	runSimulation : true,
+
 	update : function() {
-		this.updateLightPosTex();
+		if (skyboxRenderer.runSimulation) {
+			this.updateLightPosTex();
+		}
 		
 		//turn on magnification filter
 		for (var side = 0; side < 6; ++side) {
