@@ -669,6 +669,13 @@ vec4 accel(metricInfo_t m, vec4 pos, vec4 vel) {
 					fsh.push(mlstr(function(){/*
 uniform float objectDist;
 uniform vec4 objectAngle;
+
+vec4 calc_pos0() {
+	vec4 pos = vec4(-objectDist, 0., 0., 0.);
+	pos.xyz = quatRotate(quatConj(objectAngle), pos.xyz);
+	return pos;
+}
+
 */}));
 
 					if (shaderType == 'reset') {
@@ -687,8 +694,7 @@ void main() {
 							fsh.push(mlstr(function(){/*
 varying vec3 vtxv;
 void main() {
-	gl_FragColor = vec4(-objectDist, 0., 0., 0.);
-	gl_FragColor.xyz = quatRotate(quatConj(objectAngle), gl_FragColor.xyz);
+	gl_FragColor = calc_pos0();
 }
 */}));
 						} else if (pos_or_vel == 'vel') {
@@ -713,16 +719,18 @@ float reset_w(vec4 pos, vec4 vel) {
 	return a + sqrt(bsq);
 }
 
-varying vec3 vtxv;
-void main() {
-	vec4 pos = vec4(-objectDist, 0., 0., 0.);
-	pos.xyz = quatRotate(quatConj(objectAngle), pos.xyz);
-	
+//relies on objectAngle
+vec4 calc_vel0(vec4 pos, vec3 vtxv) {
 	vec4 vel = vec4(normalize(vtxv.xyz), 0.);
 	vel.xyz = quatRotate(quatConj(objectAngle), vel.xyz);
-	
-	gl_FragColor.xyz = vel.xyz;
-	gl_FragColor.w = reset_w(pos, vel);
+	vel.w = reset_w(pos, vel);
+	return vel;
+}
+
+varying vec3 vtxv;
+void main() {
+	vec4 pos = calc_pos0();
+	gl_FragColor = calc_vel0(pos, vtxv.xyz);	
 }
 */}));
 						}
