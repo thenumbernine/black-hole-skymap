@@ -195,81 +195,6 @@ vec4 accel(metricInfo_t m, vec4 pos, vec4 vel) {
 */}),
 
 
-/*
-1 = (x^2 + y^2) / (r^2 + a^2) + z^2 / r^2
-r^4 + r^2 (a^2 - x^2 - y^2 - z^2) - a^2 z^2 = 0
-
-b = a^2 - x^2 - y^2 - z^2
-r^2 = 1/2 ( -b +- sqrt( b*b + 4 * a^2 * z^2))
-
-4 r^3 dr + 2 r dr (a^2 - x^2 - y^2 - z^2) + r^2 (-2 x dx - 2 y dy - 2 z dz) - 2 a^2 z dz = 0
-(4 r^2 + 2 (a^2 - x^2 - y^2 - z^2)) r dr - 2 r^2 x dx - 2 r^2 y dy - 2 (r^2 + a^2) z dz = 0
-
-dr/dx = r x / (2 r^2 + a^2 - x^2 - y^2 - z^2)
-dr/dy = r y / (2 r^2 + a^2 - x^2 - y^2 - z^2)
-dr/dz = (r^2 + a^2) z/r / (2 r^2 + a^2 - x^2 - y^2 - z^2)
-r_,i = (r + delta_iz a^2 / r) / (2 r^2 + a^2 - x^2 - y^2 - z^2) x^i
-
-l_t = 1
-l_x = (r x + a y) / (r^2 + a^2)
-l_y = (r y - a x) / (r^2 + a^2)
-l_z = z / r
-
-l_t,u = 0
-l_u,t = 0
-l_x,x = ((r,x x + r) (r^2 + a^2) - (r x + a y) (2 r r,x)) / (r^2 + a^2)^2
-l_x,y = ((r,y x + a) (r^2 + a^2) - (r x + a y) (2 r r,y)) / (r^2 + a^2)^2
-l_x,z = ((r,z x    ) (r^2 + a^2) - (r x + a y) (2 r r,z)) / (r^2 + a^2)^2
-l_y,x = ((r,x y - a) (r^2 + a^2) - (r y - a x) (2 r r,x)) / (r^2 + a^2)^2
-l_y,y = ((r,y y + r) (r^2 + a^2) - (r y - a x) (2 r r,y)) / (r^2 + a^2)^2
-l_y,z = ((r,z y    ) (r^2 + a^2) - (r y - a x) (2 r r,z)) / (r^2 + a^2)^2
-l_z,x = -z r,x / r^2
-l_z,y = -z r,y / r^2
-l_z,z = (r - z r,z) / r^2
-
-
-H = .5 (r R - Q^2) / (r^2 + a^2 z^2/r^2)
-H_,t = 0
-H_,i = (
-		.5 r_,i R (r^2 + a^2 z^2 / r^2) 
-		- (r R - Q^2) (r r_,i + a^2 (delta_zi r - z r_,i) z / r^3)
-	) / (r^2 + a^2 z^2 / r^2)^2
-
-g_uv = eta_uv + 2 H l_u l_v
-g_tt = -1 + 2 H
-g_ti = 2 H l_i
-g_ij = delta_ij + 2 H l_i l_j
-
-g^uv = eta^uv - 2 H (eta^ua l_a) (eta^vb l_b)
-g^tt = -1 - 2 H
-g^ti = 2 H l_i
-g^ij = delta^ij - 2 H l_i l_j
-
-g_uv,w = 2 (H,w l_u l_v + H (l_u,w l_v + l_u l_v,w))
-g_uv,t = 0
-g_tt,k = 2 H_,k
-g_ti,k = 2 l_i H_,k + 2 H l_i,k
-g_ij,k = 2 (H,k l_i l_j + H (l_i,k l_j + l_i l_j,k))
-
-Conn_uvw = 1/2 (g_uv,w + g_uw,v - g_wv,u)
-	= H,w l_u l_v + H (l_u,w l_v + l_u l_v,w)
-		+ H,v l_u l_w + H (l_u,v l_w + l_u l_w,v)
-		- H,u l_w l_v - H (l_w,u l_v + l_w l_v,u)
-	= H,w l_u l_v + H,v l_u l_w - H,u l_w l_v 
-		+ H (
-			l_u (l_v,w + l_w,v)
-			+ l_v (l_u,w - l_w,u)
-			+ l_w (l_u,v - l_v,u)
-		)
-
-Conn_uvw u^v u^w
-	= 	  2 l_u (l_v u^v) (H,w u^w)
-		+ 2 l_u H (l_v,w u^v u^w)
-		- H,u (l_v u^v)^2
-		+ 2 H u^w l_v u^v (l_u,w - l_w,u)
-*/
-
-
 				['Kerr Black Hole'] : mlstr(function(){/*
 uniform float blackHoleMass;
 uniform float blackHoleCharge;
@@ -313,27 +238,6 @@ vec3 g_ti(metricInfo_t m) {
 
 mat3 g_ij(metricInfo_t m) {
 	return mat3(1.) + 2. * m.H * outerProduct(m.l, m.l);
-}
-
-mat4 transpose(mat4 m) {
-	mat4 r;
-	r[0][0] = m[0][0];
-	r[1][0] = m[0][1];
-	r[2][0] = m[0][2];
-	r[3][0] = m[0][3];
-	r[0][1] = m[1][0];
-	r[1][1] = m[1][1];
-	r[2][1] = m[1][2];
-	r[3][1] = m[1][3];
-	r[0][2] = m[2][0];
-	r[1][2] = m[2][1];
-	r[2][2] = m[2][2];
-	r[3][2] = m[2][3];
-	r[0][3] = m[3][0];
-	r[1][3] = m[3][1];
-	r[2][3] = m[3][2];
-	r[3][3] = m[3][3];
-	return r;
 }
 
 vec4 accel(metricInfo_t m, vec4 pos, vec4 vel) {
@@ -380,22 +284,20 @@ vec4 accel(metricInfo_t m, vec4 pos, vec4 vel) {
 	dl_dx[2][1] = -pos.z * dr_dx.y / rSq;
 	dl_dx[2][2] = (r - pos.z * dr_dx.z) / rSq;
 
-	vec4 dl_dx_vel = dl_dx * vel;
-	float vel_dl_dx_vel = dot(dl_dx_vel, vel);
-	
 	vec4 l = vec4(m.l, 1.);
 	float l_dot_vel = dot(l, vel);
 	float dH_dx_dot_vel = dot(dH_dx, vel);
+	float vel_dl_dx_vel = dot(vel, dl_dx * vel);
 	vec4 conn_vel_vel = 
 		l * 2. * (
 			l_dot_vel * dH_dx_dot_vel
 			+ H * vel_dl_dx_vel
 		)
 		- dH_dx * l_dot_vel * l_dot_vel
-		+ 2. * H * (dl_dx - transpose(dl_dx)) * vel * l_dot_vel;
-	
+		+ 2. * H * l_dot_vel * (dl_dx - transpose(dl_dx)) * vel;
+
 	vec4 lU = vec4(m.l, -1.);
-	
+#if 0
 	mat4 gInv = mat4(
 		vec4(1., 0., 0., 0.),
 		vec4(0., 1., 0., 0.),
@@ -405,6 +307,22 @@ vec4 accel(metricInfo_t m, vec4 pos, vec4 vel) {
 
 	// conn^a_bc = g^ad conn_dbc
 	return -gInv * conn_vel_vel;
+#endif
+#if 1
+	//g^ab = eta^ab - 2 H l*^a l*^b
+	//c^a = g^ab c_b = (eta^ab - 2 H l*^a l*^b) c_b 
+	//	= eta^ab c_b - 2 H l*^a l*^b c_b 
+	//
+	//c^t = eta^tb c_b - 2 H l*^t l*^b c_b 
+	//c^t = -c_t + 2 H l*^b c_b 
+	//
+	//c^i = eta^ib c_b - 2 H l*^i l*^b c_b 
+	//c^i = c_i - 2 H l*^i l*^b c_b 
+	float conn_vel_vel_lU = dot(conn_vel_vel, lU);
+	return -vec4(
+		conn_vel_vel.xyz - lU.xyz * 2. * H * conn_vel_vel_lU,
+		-conn_vel_vel.w + 2. * H * conn_vel_vel_lU);
+#endif
 }
 */}),
 		

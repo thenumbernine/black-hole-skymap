@@ -72,6 +72,27 @@ mat4 outerProduct(vec4 a, vec4 b) {
 	);
 }
 
+mat4 transpose(mat4 m) {
+	mat4 r;
+	r[0][0] = m[0][0];
+	r[1][0] = m[0][1];
+	r[2][0] = m[0][2];
+	r[3][0] = m[0][3];
+	r[0][1] = m[1][0];
+	r[1][1] = m[1][1];
+	r[2][1] = m[1][2];
+	r[3][1] = m[1][3];
+	r[0][2] = m[2][0];
+	r[1][2] = m[2][1];
+	r[2][2] = m[2][2];
+	r[3][2] = m[2][3];
+	r[0][3] = m[3][0];
+	r[1][3] = m[3][1];
+	r[2][3] = m[3][2];
+	r[3][3] = m[3][3];
+	return r;
+}
+
 vec3 quatRotate(vec4 q, vec3 v) { 
 	return v + 2. * cross(cross(v, q.xyz) - q.w * v, q.xyz);
 }
