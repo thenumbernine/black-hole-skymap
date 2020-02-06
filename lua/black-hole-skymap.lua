@@ -25,18 +25,15 @@ conn^phi_theta_theta = -sin(phi) cos(phi)
 --]]
 
 require 'ext'
-local ImGuiApp = require 'imguiapp'
-local View = require 'glapp.view'
-local Orbit = require 'glapp.orbit'
 local bit = require 'bit'
 local ffi = require 'ffi'
 local gl = require 'gl'
 local glu = require 'ffi.glu'
 local sdl = require 'ffi.sdl'
 local ig = require 'ffi.imgui'
-local Quat = require 'vec.quat'
-local vec2 = require 'vec.vec2'
-local vec3 = require 'vec.vec3'
+local vec2d = require 'vec-ffi.vec2d'
+local vec3d = require 'vec-ffi.vec3d'
+local quatd = require 'vec-ffi.quatd'
 local GLTex2D = require 'gl.tex2d'
 local GLTexCube = require 'gl.texcube'
 local GLProgram = require 'gl.program'
@@ -44,8 +41,8 @@ local FBO = require 'gl.fbo'
 local glreport = require 'gl.report'
 
 local skyTex
---local viewRot = Quat(0,math.sqrt(.5),0,math.sqrt(.5))*Quat(math.sqrt(.5),0,0,-math.sqrt(.5))
---local viewAngleAxis = Quat()
+--local viewRot = quatd(0,math.sqrt(.5),0,math.sqrt(.5))*quatd(math.sqrt(.5),0,0,-math.sqrt(.5))
+--local viewAngleAxis = quatd(0,0,0,1)
 --local zNear = .1
 --local zFar = 100
 --local tanFov = 1
@@ -72,16 +69,16 @@ cubeFaces = {
 }
 
 local uvs = {
-	vec2(0,0),
-	vec2(1,0),
-	vec2(1,1),
-	vec2(0,1),
+	vec2d(0,0),
+	vec2d(1,0),
+	vec2d(1,1),
+	vec2d(0,1),
 }
 
 local deltaLambdaPtr = ffi.new('float[1]', 1.)
 local iterationsPtr = ffi.new('int[1]', 1)
 
-local App = class(Orbit(View.apply(ImGuiApp)))
+local App = class(require 'glapp.orbit'(require 'imguiapp'))
 
 App.title = 'black hole raytracer'
 App.viewDist = 20
@@ -90,8 +87,8 @@ function App:initGL()
 	App.super.initGL(self)
 
 	self.view.angle = 
-		Quat(-math.sqrt(.5), 0, 0, -math.sqrt(.5))
-		* Quat(0, -math.sqrt(.5), 0, math.sqrt(.5))
+		quatd(-math.sqrt(.5), 0, 0, -math.sqrt(.5))
+		* quatd(0, -math.sqrt(.5), 0, math.sqrt(.5))
 
 	skyTex = GLTexCube{
 		filenames = {
@@ -112,6 +109,8 @@ function App:initGL()
 	}
 		
 	local shaderDefs = [[
+#version 120
+
 #define DLAMBDA 0.1
 #define M_PI 3.14159265358979311599796346854418516159057617187500
 #define ITERATIONS 1
@@ -204,8 +203,8 @@ void main() {
 		gl_ModelViewMatrix[0].xyz,
 		gl_ModelViewMatrix[1].xyz,
 		gl_ModelViewMatrix[2].xyz));
-	vec3 eyePos = -rot * gl_ModelViewMatrix[3].xyz;
-	vec3 vtxPos = rot * gl_Vertex.xyz + eyePos;
+	eyePos = -rot * gl_ModelViewMatrix[3].xyz;
+	vtxPos = rot * gl_Vertex.xyz + eyePos;
 
 	gl_Position = gl_ProjectionMatrix * gl_Vertex;
 }
@@ -491,7 +490,7 @@ function App:update()
 		local tanFovY = math.tan(view.fovY / 2)
 		local tanFovX = aspectRatio * tanFovY
 local oldpos = view.pos
-view.pos = vec3(0,0,0)
+view.pos = vec3d(0,0,0)
 view:setup(aspectRatio)
 view.pos = oldpos
 
@@ -505,8 +504,8 @@ view.pos = oldpos
 				callback = function()
 					gl.glBegin(gl.GL_QUADS)
 					for _,uv in ipairs(uvs) do
-						gl.glVertex3f((uv[1] - .5) * 2 * tanFovX, 
-							(uv[2] - .5) * 2 * tanFovY,
+						gl.glVertex3f((uv.x - .5) * 2 * tanFovX, 
+							(uv.y - .5) * 2 * tanFovY,
 							-1)
 					end
 					gl.glEnd()
@@ -538,7 +537,7 @@ view.pos = oldpos
 				callback = function()
 					gl.glBegin(gl.GL_QUADS)
 					for _,uv in ipairs(uvs) do
-						gl.glVertex2f(uv[1], uv[2])
+						gl.glVertex2f(uv:unpack())
 					end
 					gl.glEnd()
 				end,
@@ -566,7 +565,7 @@ view.pos = oldpos
 	skyTex:bind(1)
 	gl.glBegin(gl.GL_QUADS)
 	for _,uv in ipairs(uvs) do
-		gl.glVertex2f(uv[1], uv[2])
+		gl.glVertex2f(uv:unpack())
 	end
 	gl.glEnd()
 	drawLightShader:useNone()
