@@ -111,17 +111,15 @@ vec4 accel(metricInfo_t m, vec4 pos, vec4 vel) {
 	float inv_r = m.inv_r;
 	float x_dot_v = dot(pos.xyz, vel.xyz);
 	float velSq = dot(vel.xyz, vel.xyz);
-	float R = 2. * blackHoleMass;
 	float inv_r2 = inv_r * inv_r;
 	float inv_r3 = inv_r * inv_r2;
 	
 	float _1_plus_m_2r_tothe6 = m._1_plus_m_2r_sq * m._1_plus_m_2r_toTheFourth;
 	
 	vec4 result;
-	result.w = -blackHoleMass * 2. * vel.w * x_dot_v * inv_r3 / (m._1_plus_m_2r * m._1_minus_m_2r);
+	result.w = 0.;
 	result.xyz = -blackHoleMass * (
 		vel.w * vel.w * pos.xyz * m._1_minus_m_2r / _1_plus_m_2r_tothe6
-		- 2. * vel.xyz * x_dot_v
 		+ velSq * pos.xyz
 	) * inv_r3 / m._1_plus_m_2r;
 	return result;
