@@ -1,9 +1,4 @@
-# A NOTE TO ANYONE FOLLOWING THE LINK FROM http://spiro.fisica.unipd.it/~antonell/schwarzschild/
-
-This guy was kind enough to reference this page and publicise a previous math error I had made (I had left out of the LaTeX description the cross terms in the Cartesian form of the Schwarzschild metric). If only he was kind enough to attempt to contact me in private first, I could have reminded him that the renderer implementation's geodesic calculations were based on the correct pseudo-Cartesian metric all along. Here's where I got the metric from:  [Catalogue of Spacetimes](https://arxiv.org/abs/0904.4184) by Mueller & Grave. Here's my [geodesic calculations](http://christopheremoore.net/symbolic-lua/test-output/Schwarzschild%20-%20Cartesian.html) based on my [Computer Algebra System](http://christopheremoore.net/symbolic-lua) in Lua.
-
-For what it's worth, as long as he's doing his calculations in spherical coordinates, he is going to run into numerical errors at the poles -- which he probably won't overcome until he makes the switch to pseudo-Cartesian as well.  This is probably why his orbiting view is fixed to the equatorial plane.
-
+[![paypal](https://www.paypalobjects.com/en_US/i/btn/btn_donateCC_LG.gif)](https://www.paypal.com/cgi-bin/webscr?cmd=_s-xclick&hosted_button_id=KYWUWS86GSFGL)
 
 ## black hole raytrace simulator
 
@@ -30,3 +25,11 @@ The second version, and subsequently first WebGL version, is in the 'v1' folder.
 of a direct port of the Lua version and is likewise driven by FBOs, yet my current hardware
 doesn't support float textures =( I'll test and rework it another time.  Am somehow withholding 
 myself from writing a 24bpp fixed-point-precision raytracer.
+
+
+# A NOTE TO ANYONE FOLLOWING THE LINK FROM http://spiro.fisica.unipd.it/~antonell/schwarzschild/
+
+This guy was kind enough to reference this page and publicise a previous math error I had made (I had left out of the LaTeX description the cross terms in the Cartesian form of the Schwarzschild metric). If only he was kind enough to attempt to contact me in private first, I could have reminded him that the renderer implementation's geodesic calculations were based on the correct pseudo-Cartesian metric all along. Here's where I got the metric from:  [Catalogue of Spacetimes](https://arxiv.org/abs/0904.4184) by Mueller & Grave. Here's my [geodesic calculations](http://christopheremoore.net/symbolic-lua/test-output/Schwarzschild%20-%20Cartesian.html) based on my [Computer Algebra System](http://christopheremoore.net/symbolic-lua) in Lua.
+
+For what it's worth, as long as he's doing his calculations in spherical coordinates, he is going to run into numerical errors at the poles -- which he probably won't overcome until he makes the switch to pseudo-Cartesian as well.  This is probably why his orbiting view is fixed to the equatorial plane.
+
