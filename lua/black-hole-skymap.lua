@@ -30,7 +30,7 @@ local ffi = require 'ffi'
 local gl = require 'gl'
 local glu = require 'ffi.glu'
 local sdl = require 'ffi.sdl'
-local ig = require 'ffi.imgui'
+local ig = require 'imgui'
 local vec2d = require 'vec-ffi.vec2d'
 local vec3d = require 'vec-ffi.vec3d'
 local quatd = require 'vec-ffi.quatd'
@@ -75,8 +75,9 @@ local uvs = {
 	vec2d(0,1),
 }
 
-local deltaLambdaPtr = ffi.new('float[1]', 1.)
-local iterationsPtr = ffi.new('int[1]', 1)
+-- _G for input
+deltaLambdaPtr = 1
+iterationsPtr = 1
 
 local App = class(require 'glapp.orbit'(require 'imguiapp'))
 
@@ -470,8 +471,8 @@ end
 	
 function App:updateGUI()
 	ig.igText'testing testing'
-	ig.igInputFloat('delta lambda', deltaLambdaPtr)
-	ig.igInputInt('iterations', iterationsPtr)
+	ig.luatableInputFloat('delta lambda', _G, 'deltaLambdaPtr')
+	ig.luatableInputInt('iterations', _G, 'iterationsPtr')
 end
 	
 function App:update()
