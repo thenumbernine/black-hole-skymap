@@ -79,7 +79,7 @@ local uvs = {
 deltaLambdaPtr = 1
 iterationsPtr = 1
 
-local App = class(require 'glapp.orbit'(require 'imguiapp'))
+local App = require 'imguiapp.withorbit'()
 
 App.title = 'black hole raytracer'
 App.viewDist = 20
