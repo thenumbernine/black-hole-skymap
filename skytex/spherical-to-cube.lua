@@ -102,7 +102,7 @@ do
 		local mipMapFilename = 'mipmap-'..level..'.png'
 		if mipMapWidth == 0 or mipMapHeight == 0 then break end
 		local newMipMap
-		if os.fileexists(mipMapFilename) then
+		if file(mipMapFilename):exists() then
 			newMipMap = Image(mipMapFilename)
 		else
 			io.write('saving '..mipMapFilename..'     ') io.flush()
