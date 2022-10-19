@@ -1,6 +1,8 @@
-[![paypal](https://www.paypalobjects.com/en_US/i/btn/btn_donateCC_LG.gif)](https://www.paypal.com/cgi-bin/webscr?cmd=_s-xclick&hosted_button_id=KYWUWS86GSFGL)
+[![Donate via Stripe](https://img.shields.io/badge/Donate-Stripe-green.svg)](https://buy.stripe.com/00gbJZ0OdcNs9zi288)<br>
+[![Donate via Bitcoin](https://img.shields.io/badge/Donate-Bitcoin-green.svg)](bitcoin:37fsp7qQKU8XoHZGRQvVzQVP8FrEJ73cSJ)<br>
+[![Donate via Paypal](https://img.shields.io/badge/Donate-Paypal-green.svg)](https://buy.stripe.com/00gbJZ0OdcNs9zi288)
 
-## black hole raytrace simulator
+## Black Hole Raytrace Simulator
 
 http://christopheremoore.net/black-hole-skymap/
 
@@ -18,12 +20,12 @@ The first version of this I wrote as a luajit script.  It works with Malkia's UF
 auxiliary lua libraries I have yet to post.  Find it in the lua/ folder.
 That version operates via floating point FBO (much faster), yet it ran only in the view plane
 and therefore had to reset all cast rays every time the camera moved.  Another downfall is you'll
-find the Schwarzschild metric to be in spherical coordinate form, which caused floating point 
+find the Schwarzschild metric to be in spherical coordinate form, which caused floating point
 precision errors at the poles and along one of the dividing lines of the sphere.
 
 The second version, and subsequently first WebGL version, is in the 'v1' folder.  It is as close
 of a direct port of the Lua version and is likewise driven by FBOs, yet my current hardware
-doesn't support float textures =( I'll test and rework it another time.  Am somehow withholding 
+doesn't support float textures =( I'll test and rework it another time.  Am somehow withholding
 myself from writing a 24bpp fixed-point-precision raytracer.
 
 
