@@ -73,27 +73,48 @@ uniform float blackHoleMass;
 //* update of x''^a = -Gamma^a_bc x'^b x'^c (in the fragment shader update)
 struct metricInfo_t {
 	float inv_r;
-	float _1_plus_m_2r;
-	float _1_minus_m_2r;
-	float _1_plus_m_2r_sq;
-	float _1_plus_m_2r_toTheFourth;
+	float inv_rho;
+	float _1_plus_m_2rho;
+	float _1_minus_m_2rho;
+	float _1_plus_m_2rho_sq;
+	float _1_plus_m_2rho_toTheFourth;
 };
+
+float sqr(float x) { return x * x; }
+
+float rhoForR(float r) {
+	float rho = r;
+#define INVERSE_NEWTON_EPSILON 1e-7
+#define INVERSE_NEWTON_MAXITER 20.	//define because otherwise I get "Loop index cannot be compared with non-constant expression"
+	for (float iter = 0.; iter < INVERSE_NEWTON_MAXITER; ++iter) {
+		float r_of_rho = rho * sqr(1. + blackHoleMass / (2. * rho));
+		float dr_drho = 1. - sqr(blackHoleMass / (2. * rho));
+		float drho = (r_of_rho - r) / dr_drho;
+		rho -= drho;
+		if (abs(drho) < INVERSE_NEWTON_EPSILON) break;
+	}
+	return rho;
+}
 
 metricInfo_t init_metricInfo(vec4 pos) {
 	float r = length(pos.xyz);
+	
+	float rho = rhoForR(r);
+	
 	metricInfo_t m;
 	m.inv_r = 1. / r;
-	float _m_2r = .5 * blackHoleMass * m.inv_r;
-	m._1_minus_m_2r = 1. - _m_2r;
-	m._1_plus_m_2r = 1. + _m_2r;
-	m._1_plus_m_2r_sq = m._1_plus_m_2r * m._1_plus_m_2r;
-	m._1_plus_m_2r_toTheFourth = m._1_plus_m_2r_sq * m._1_plus_m_2r_sq;
+	m.inv_rho = 1. / rho;
+	float _m_2rho = .5 * blackHoleMass * m.inv_rho;
+	m._1_minus_m_2rho = 1. - _m_2rho;
+	m._1_plus_m_2rho = 1. + _m_2rho;
+	m._1_plus_m_2rho_sq = sqr(m._1_plus_m_2rho);
+	m._1_plus_m_2rho_toTheFourth = sqr(m._1_plus_m_2rho_sq);
 	return m;
 }
 
 // g_tt = -(1 - m/(2r))^2 / (1 + m/(2r))^2
 float g_tt(metricInfo_t m) {
-	float ratio = m._1_minus_m_2r / m._1_plus_m_2r;
+	float ratio = m._1_minus_m_2rho / m._1_plus_m_2rho;
 	return -ratio * ratio;
 }
 
@@ -104,7 +125,7 @@ vec3 g_ti(metricInfo_t m) {
 
 // g_ij = delta_ij (1 + m/(2r))^4
 mat3 g_ij(metricInfo_t m) {
-	return mat3(m._1_plus_m_2r_toTheFourth);
+	return mat3(m._1_plus_m_2rho_toTheFourth);
 }
 
 vec4 accel(metricInfo_t m, vec4 pos, vec4 vel) {
@@ -114,14 +135,14 @@ vec4 accel(metricInfo_t m, vec4 pos, vec4 vel) {
 	float inv_r2 = inv_r * inv_r;
 	float inv_r3 = inv_r * inv_r2;
 	
-	float _1_plus_m_2r_tothe6 = m._1_plus_m_2r_sq * m._1_plus_m_2r_toTheFourth;
+	float _1_plus_m_2r_tothe6 = m._1_plus_m_2rho_sq * m._1_plus_m_2rho_toTheFourth;
 	
 	vec4 result;
 	result.w = 0.;
 	result.xyz = -blackHoleMass * (
-		vel.w * vel.w * pos.xyz * m._1_minus_m_2r / _1_plus_m_2r_tothe6
+		vel.w * vel.w * pos.xyz * m._1_minus_m_2rho / _1_plus_m_2r_tothe6
 		+ velSq * pos.xyz
-	) * inv_r3 / m._1_plus_m_2r;
+	) * inv_r3 / m._1_plus_m_2rho;
 	return result;
 }
 
