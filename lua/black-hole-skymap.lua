@@ -111,7 +111,7 @@ function App:initGL()
 	local shaderDefs = [[
 #version 120
 
-#define DLAMBDA 0.1
+#define DLAMBDA .1
 #define M_PI 3.14159265358979311599796346854418516159057617187500
 #define ITERATIONS 1
 
@@ -475,8 +475,6 @@ function App:updateGUI()
 end
 	
 function App:update()
-	App.super.update(self)
-	
 	local view = self.view
 	local viewWidth, viewHeight = self.width, self.height
 	local aspectRatio = viewWidth / viewHeight
@@ -593,6 +591,7 @@ view.pos = oldpos
 	--]]
 
 	glreport('update done')
+	App.super.update(self)
 end
 
 App():run()
