@@ -5,26 +5,25 @@ cube map render
 shader that iterates along geodesic from the view plane backwards through time to infinity
 then reprojects onto the cubemap
 
-schwarzschild metric: ds^2 = -(1-R/r)dt^2 + 1/(1-R/r)dr^2 + r^2 (dtheta^2 + sin(theta)^2 dphi^2)
+schwarzschild metric: ds^2 = -(1-R/r)dt^2 + 1/(1-R/r)dr^2 + r^2 (dθ^2 + sin(θ)^2 dφ^2)
 where R = 2M is the schwarzschild radius
 
 christoffel symbols:
 
-conn^r_t_t = R(r-R)/(2r^3)
-conn^t_t_r = -conn^r_r_r = R/(2r(r-R))
-conn^phi_r_phi = conn^theta_r_theta = 1/r
-conn^r_phi_phi = -(r - R)
-conn^theta_phi_theta = cos(phi)/sin(phi)
-conn^r_theta_theta = -(r - R) sin(phi)^2
-conn^phi_theta_theta = -sin(phi) cos(phi)
+conn^r_tt = R(r-R)/(2r^3)
+conn^t_tr = -conn^r_rr = R/(2r(r-R))
+conn^φ_rφ = conn^θ_rθ = 1/r
+conn^r_φφ = -(r - R)
+conn^θ_φθ = cos(φ)/sin(φ)
+conn^r_θθ = -(r - R) sin(φ)^2
+conn^φ_θθ = -sin(φ) cos(φ)
 
 -t'' = R/(r(r-R)) t' r'
--r'' = R(r-R)/(2r^3) t'^2 - R/(2r(r-R)) r'^2 - (r - R) phi'^2 - (r - R) sin(phi)^2 theta'^2
--theta'' = 2/r r' theta' + 2 cos(phi)/sin(phi) phi' theta'
--phi'' = 2/r r' phi' - sin(phi) cos(phi) theta'^2
+-r'' = R(r-R)/(2r^3) t'^2 - R/(2r(r-R)) r'^2 - (r - R) φ'^2 - (r - R) sin(φ)^2 θ'^2
+-θ'' = 2/r r' θ' + 2 cos(φ)/sin(φ) φ' θ'
+-φ'' = 2/r r' φ' - sin(φ) cos(φ) θ'^2
 --]]
 
-require 'ext'
 local bit = require 'bit'
 local ffi = require 'ffi'
 local gl = require 'gl'
@@ -234,7 +233,7 @@ void main() {
 	$assign
 }
 ]]
-		
+
 	initLightPosShader = GLProgram{
 		vertexCode = initLightShaderVertexCode,
 		fragmentCode = initLightShaderFragmentCode:gsub('$assign', 'gl_FragColor = rel;'),
