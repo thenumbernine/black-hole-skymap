@@ -168,8 +168,12 @@ $.
 			<h3>Schwarzschild Geodesic</h3>
 			The Schwarzschild metric describes the curvature of spacetime around a spherical object.
 			The Schwarzschild metric in spherical coordinates is $ ds^2 = -(1 - {2 M \over r}) {dt}^2 + (1 - \frac{2 M}{r} )^{-1} dr^2 + r^2 (d\theta^2 + sin(\theta)^2 d\phi^2) $ for M the mass of the object.<br>
-			In isotropic Cartesian coordinates it is given as $ ds^2 = -\left( \frac{1-\frac{M}{2r}}{1+\frac{M}{2r}} \right)^2 dt^2 + \left( 1 + \frac{M}{2r} \right)^4 (dx^2 + dy^2 + dz^2)$.<br>
-			
+			In isotropic Cartesian coordinates it is given as $ ds^2 = -\left( \frac{1-\frac{M}{2\rho}}{1+\frac{M}{2\rho}} \right)^2 dt^2 + \left( 1 + \frac{M}{2\rho} \right)^4 (dx^2 + dy^2 + dz^2)$, 
+			where $r = \rho (1 + \frac{M}{2\rho})^2$.<br>
+	
+<img src="r_for_rho.svg"/><br>
+<br>
+
 			<h3>Kerr Geodesic</h3>
 			The Kerr metric describes the curvature of spacetime around a spherical rotating object.
 			The metric is given as $ {ds}^2 = -{dt}^2 + {dx}^2 + {dy}^2 + {dz}^2 + {2mr^3 \over {r^4 + a^2 z^2}} (dt + {{rx+ay}\over{a^2+r^2}} dx + {{ry-ax}\over{a^2+r^2}} dy + {z \over r} dz)^2 $
