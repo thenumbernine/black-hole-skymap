@@ -75,6 +75,11 @@ z = rho cos(theta)
 ... but then rho serves as the same definition as the radial coordinate of a spherical coordinate system
 ... so rho = sqrt(x^2 + y^2 + z^2)
 ... so we don't even need to use the Schwarzschild 'r' coordinate?
+sure enough:
+https://physics.stackexchange.com/questions/319133/isotropic-schwarzschild-coordinates?rq=1
+https://descanso.jpl.nasa.gov/monograph/series2/Descanso2_all.pdf
+yes, the isotropic 'rho' (not equal to the Schwarzschild-spherical 'r')
+is what NASA interprets as ordinary euclidian distance
 */
 				['Schwarzschild Black Hole'] : mlstr(function(){/*
 uniform float blackHoleMass;
