@@ -16,15 +16,24 @@
 		<script type='text/javascript' src='/js/gl-util-unitquad.js'></script>
 		<script type='text/javascript' src='/js/gl-util-kernel.js'></script>
 		<script type='text/javascript' src='/js/mouse3d.js'></script>
-		<script type='text/javascript' src='/MathJax/MathJax.js?config=TeX-AMS-MML_HTMLorMML'></script>
+<script type="text/javascript">
+// mathjax config
+// https://docs.mathjax.org/en/latest/web/configuration.html
+MathJax = {
+	tex: {
+		inlineMath: [['$', '$'], ['\\(', '\\)']]
+	},
+	svg: {
+		fontCache: 'global'
+	}
+};
+</script>
+		<script type="text/javascript" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-svg.js"></script>
 		<script type='text/javascript' src='renderer.testcube.js'></script>
 		<script type='text/javascript' src='renderer.sw.js'></script>
 		<script type='text/javascript' src='renderer.fbo.js'></script>
 		<script type='text/javascript' src='main.js'></script>
 
-<script>
-MathJax.Hub.Config({tex2jax: {inlineMath: [['$','$'], ['\\(','\\)']]}});
-</script>
 <!-- script type='text/javascript'>
 var _gaq = _gaq || [];
 _gaq.push(['_setAccount', 'UA-17312646-1']);
