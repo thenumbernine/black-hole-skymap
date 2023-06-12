@@ -1,31 +1,27 @@
+function makeGeodesicSWRenderer(_G) {
+const glutil = _G.glutil;
+const objectTypes = _G.objectTypes;
+const shaderCommonCode = _G.shaderCommonCode;
+const angleForSide = _G.angleForSide;
+const hsvTex = _G.hsvTex;
+const glMaxCubeMapTextureSize = _G.glMaxCubeMapTextureSize;
+const gl = glutil.context;
 /*
 The original rendered a viewport quad and subsequently iterated over it to raytrace through the scene. Worked great until you moved the camera.
 I wanted to make a subsequent one that FBO'd six sides of a cubemap so you could at least turn your head (would still require redraw if you translated the camera).
 But my current hardware doesn't even support float buffers, so I'll have to be creative about my current setup.
 I could encode a cubemap as rgb => xyz, keep it normalized, and iterate through spacetime with that.  resolution would be low.  interpolation could help, or a 2nd tex for extra precision.
 */
-GeodesicSWRenderer = makeClass({
-	updateInterval : undefined,
-	
-	//I'm updating in software, so on my tablet 512 is a bit slow
-	//if I stop iteration after reaching a steady state, maybe I'll up resolution then
-	//...or do some sort of adaptive thing ...
-	lightTexWidth : 256,
-	lightTexHeight : 256,
-
-	init : function(glutil) {
-		this.glutil = glutil;
-	},
-
-	initScene : function(skyTex) {
+class GeodesicSWRenderer {
+	initScene(skyTex) {
 		if (this.lightTexWidth > glMaxCubeMapTextureSize || this.lightTexHeight > glMaxCubeMapTextureSize) {
 			throw "light tex size "+this.lightTexWidth+"x"+this.lightTexHeight+" cannot exceed "+glMaxCubeMapTextureSize;
 		}
 		this.lightVelTexData = [];
-		for (var side = 0; side < 6; ++side) {
+		for (let side = 0; side < 6; ++side) {
 			this.lightVelTexData[side] = new Uint8Array(3 * this.lightTexWidth * this.lightTexHeight);
 		}	
-		this.lightVelTex = new this.glutil.TextureCube({
+		this.lightVelTex = new glutil.TextureCube({
 			internalFormat : gl.RGB,
 			format : gl.RGB,
 			type : gl.UNSIGNED_BYTE,
@@ -43,11 +39,10 @@ GeodesicSWRenderer = makeClass({
 
 		this.lightBuf = new Float32Array(6 * 4 * 2 * this.lightTexWidth * this.lightTexHeight);
 
-		var cubeShader = new this.glutil.ShaderProgram({
-			vertexPrecision : 'best',
-			vertexCode : mlstr(function(){/*
-attribute vec3 vertex;
-varying vec3 vertexv;
+		let cubeShader = new glutil.Program({
+			vertexCode : `
+in vec3 vertex;
+out vec3 vertexv;
 uniform mat4 projMat;
 const mat3 viewMatrixInv = mat3(
 	0., 1., 0.,
@@ -57,10 +52,9 @@ void main() {
 	vertexv = viewMatrixInv * vertex;
 	gl_Position = projMat * vec4(vertex, 1.);
 }
-*/}),
-			fragmentPrecision : 'best',
-			fragmentCode : mlstr(function(){/*
-varying vec3 vertexv;
+`,
+			fragmentCode : `
+in vec3 vertexv;
 uniform samplerCube skyTex;
 uniform samplerCube lightVelTex;
 const mat3 viewMatrix = mat3(
@@ -72,31 +66,32 @@ uniform vec4 viewAngle;
 vec3 quatRotate(vec4 q, vec3 v) { 
 	return v + 2. * cross(cross(v, q.xyz) - q.w * v, q.xyz);
 }
+out vec4 fragColor;
 void main() {
-	vec3 dir = textureCube(lightVelTex, vertexv).xyz * 2. - 1.;
+	vec3 dir = texture(lightVelTex, vertexv).xyz * 2. - 1.;
 	dir = quatRotate(viewAngle, viewMatrix * dir);
-	gl_FragColor = textureCube(skyTex, dir);
-	gl_FragColor.w = 1.; 
+	fragColor = texture(skyTex, dir);
+	fragColor.w = 1.; 
 }
-*/}),
+`,
 			uniforms : {
 				skyTex : 0,
 				lightVelTex : 1
 			}
 		});
 
-		var cubeVtxArray = new Float32Array(3*8);
-		for (var i = 0; i < 8; i++) {
+		let cubeVtxArray = new Float32Array(3*8);
+		for (let i = 0; i < 8; i++) {
 			cubeVtxArray[0+3*i] = 2*(i&1)-1;
 			cubeVtxArray[1+3*i] = 2*((i>>1)&1)-1;
 			cubeVtxArray[2+3*i] = 2*((i>>2)&1)-1;
 		}
 
-		cubeVtxBuf = new this.glutil.ArrayBuffer({
+		cubeVtxBuf = new glutil.ArrayBuffer({
 			data : cubeVtxArray 
 		});
 
-		var cubeIndexBuf = new this.glutil.ElementArrayBuffer({
+		let cubeIndexBuf = new glutil.ElementArrayBuffer({
 			data : [
 				5,7,3,3,1,5,		// <- each value has the x,y,z in the 0,1,2 bits (off = 0, on = 1)
 				6,4,0,0,2,6,
@@ -107,13 +102,13 @@ void main() {
 			]
 		});
 
-		var cubeObj = new this.glutil.SceneObject({
+		let cubeObj = new glutil.SceneObject({
 			mode : gl.TRIANGLES,
 			attrs : {
 				vertex : cubeVtxBuf
 			},
 			uniforms : {
-				viewAngle : this.glutil.view.angle
+				viewAngle : glutil.view.angle
 			},
 			indexes : cubeIndexBuf,
 			shader : cubeShader,
@@ -121,22 +116,22 @@ void main() {
 			static : false
 		});
 		
-	},
+	}
 
-	resetField : function() {
+	resetField() {
 		if (this.updateInterval !== undefined) {
 			clearInterval(this.updateInterval); 
 		}
 		this.updateInterval = undefined;
 
-		var vel = vec4.create();
-		var pos = vec4.create();
-		var lightBuf = this.lightBuf;
+		let vel = vec4.create();
+		let pos = vec4.create();
+		let lightBuf = this.lightBuf;
 		//lightBuf[side][u][v][x,y,z,w,vx,vy,vz,vw]
-		var i = 0;
-		for (var side = 0; side < 6; ++side) {
-			for (var v = 0; v < this.lightTexHeight; ++v) {
-				for (var u = 0; u < this.lightTexWidth; ++u) {
+		let i = 0;
+		for (let side = 0; side < 6; ++side) {
+			for (let v = 0; v < this.lightTexHeight; ++v) {
+				for (let u = 0; u < this.lightTexWidth; ++u) {
 					vel[0] = (u + .5) / this.lightTexWidth * 2 - 1;
 					vel[1] = (v + .5) / this.lightTexHeight * 2 - 1;
 					vel[2] = 1;
@@ -162,23 +157,23 @@ void main() {
 						// vt^2 = (vx^2 + vy^2 + vz^2) / (1 - 2M/r)^2
 						// vt = ||vx,vy,vz|| / (1 - 2M/r)
 						pos[0] -= objectDist;	//center of metric is black hole origin
-						var vSq = vec3.dot(vel, vel);
-						var r = vec3.length(pos);
-						var R = 2 * blackHoleMass;
-						var vDotX = vec3.dot(vel, pos);
+						let vSq = vec3.dot(vel, vel);
+						let r = vec3.length(pos);
+						let R = 2 * blackHoleMass;
+						let vDotX = vec3.dot(vel, pos);
 						vel[3] = (vSq + vDotX * vDotX * R / (r * r * (r - R))) * r / (r - R);
 					} else if (objectType == 'Alcubierre Warp Drive Bubble') {
 						//g_ab v^a v^b = 0
 						//... later
-						var rs = vec3.dist(pos, vec3.fromValues(objectDist,0,0));	//center is view pos, but rs is measured from bubble origin
-						var sigmaFront = warpBubbleThickness * (rs + warpBubbleRadius);
-						var sigmaCenter = warpBubbleThickness * warpBubbleRadius;
-						var sigmaBack = warpBubbleThickness * (rs - warpBubbleRadius);
-						var tanhSigmaCenter = tanh(sigmaCenter);
-						var f = (tanh(sigmaFront) - tanh(sigmaBack)) / (2 * tanhSigmaCenter);
+						let rs = vec3.dist(pos, vec3.fromValues(objectDist,0,0));	//center is view pos, but rs is measured from bubble origin
+						let sigmaFront = warpBubbleThickness * (rs + warpBubbleRadius);
+						let sigmaCenter = warpBubbleThickness * warpBubbleRadius;
+						let sigmaBack = warpBubbleThickness * (rs - warpBubbleRadius);
+						let tanhSigmaCenter = tanh(sigmaCenter);
+						let f = (tanh(sigmaFront) - tanh(sigmaBack)) / (2 * tanhSigmaCenter);
 					
-						var vf = f * warpBubbleVelocity;
-						var vf2 = vf * vf;
+						let vf = f * warpBubbleVelocity;
+						let vf2 = vf * vf;
 						vel[3] = 
 							(warpBubbleVelocity * f + Math.sqrt(
 								vf2 * (1 + vel[0] * vel[0]) + 1
@@ -199,69 +194,69 @@ void main() {
 			}
 		}
 		this.updateLightVelTex();
-	},
+	}
 
 	//update the uint8 array from the float array
 	//then upload the uint8 array to the gpu
-	updateLightVelTex : function() {	
-		var thiz = this;
-		//var progress = $('#update-progress');
+	updateLightVelTex() {	
+		let thiz = this;
+		//let progress = $('#update-progress');
 		//progress.attr('value', 0);
 		this.updateInterval = asyncfor({
 			start : 0,
 			end : 6,
 			callback : function(side) {
-				var srci = side * thiz.lightTexWidth * thiz.lightTexHeight * 8;
-				var dsti = 0;
-				var lightBuf = thiz.lightBuf;
-				var lightVelTexData = thiz.lightVelTexData;
-				for (var i = 0; i < thiz.lightTexWidth * thiz.lightTexHeight; ++i) {
+				let srci = side * thiz.lightTexWidth * thiz.lightTexHeight * 8;
+				let dsti = 0;
+				let lightBuf = thiz.lightBuf;
+				let lightVelTexData = thiz.lightVelTexData;
+				for (let i = 0; i < thiz.lightTexWidth * thiz.lightTexHeight; ++i) {
 					//read positions and velocities
-					var oldPx = lightBuf[srci+0];
-					var oldPy = lightBuf[srci+1];
-					var oldPz = lightBuf[srci+2];
-					var oldPt = lightBuf[srci+3];
-					var oldVx = lightBuf[srci+4];
-					var oldVy = lightBuf[srci+5];
-					var oldVz = lightBuf[srci+6];
-					var oldVt = lightBuf[srci+7];
+					let oldPx = lightBuf[srci+0];
+					let oldPy = lightBuf[srci+1];
+					let oldPz = lightBuf[srci+2];
+					let oldPt = lightBuf[srci+3];
+					let oldVx = lightBuf[srci+4];
+					let oldVy = lightBuf[srci+5];
+					let oldVz = lightBuf[srci+6];
+					let oldVt = lightBuf[srci+7];
 					
 					//cache change in positions by velocities
-					var newPx = oldPx + oldVx * deltaLambda;
-					var newPy = oldPy + oldVy * deltaLambda;
-					var newPz = oldPz + oldVz * deltaLambda;
-					var newPt = oldPt + oldVt * deltaLambda;
-					var newVx, newVy, newVz, newVt;
+					let newPx = oldPx + oldVx * deltaLambda;
+					let newPy = oldPy + oldVy * deltaLambda;
+					let newPz = oldPz + oldVz * deltaLambda;
+					let newPt = oldPt + oldVt * deltaLambda;
+					let newVx, newVy, newVz, newVt;
 					
 					//update velocity by geodesic equation
 					if (objectType == 'Black Hole') {
 						// Schwarzschild Cartesian metric
 						//aux variables:
-						var r = Math.sqrt(oldPx * oldPx + oldPy * oldPy + oldPz * oldPz);
-						var posDotVel = oldPx * oldVx + oldPy * oldVy + oldPz * oldVz; 
-						var posDotVelSq = posDotVel * posDotVel;
-						var velSq = oldVx * oldVx + oldVy * oldVy + oldVz * oldVz; 
-						var R = 2. * blackHoleMass;
-						var rSq = r * r;
-						var vtSq = oldVt * oldVt; 
-						var scale = (R / (rSq * r)) * (.5 * vtSq * (1 - R / r) + velSq - .5 * posDotVelSq * (3. * r - 2. * R) / (rSq * (r - R)));
+						let r = Math.sqrt(oldPx * oldPx + oldPy * oldPy + oldPz * oldPz);
+						let posDotVel = oldPx * oldVx + oldPy * oldVy + oldPz * oldVz; 
+						let posDotVelSq = posDotVel * posDotVel;
+						let velSq = oldVx * oldVx + oldVy * oldVy + oldVz * oldVz; 
+						let R = 2. * blackHoleMass;
+						let rSq = r * r;
+						let vtSq = oldVt * oldVt; 
+						let scale = (R / (rSq * r)) * (.5 * vtSq * (1 - R / r) + velSq - .5 * posDotVelSq * (3. * r - 2. * R) / (rSq * (r - R)));
 						newVx = oldVx - deltaLambda * oldPx * scale;
 						newVy = oldVy - deltaLambda * oldPy * scale;
 						newVz = oldVz - deltaLambda * oldPz * scale;
 						newVt = oldVt - deltaLambda * R / (rSq * (r - R)) * posDotVel * oldVt;
 					} else if (objectType == 'Alcubierre Warp Drive Bubble') {
-						var rs = Math.sqrt((oldPx - objectDist) * (oldPx - objectDist) + oldPy * oldPy + oldPz * oldPz);
-						var sigmaFront = warpBubbleThickness * (rs + warpBubbleRadius);
-						var sigmaCenter = warpBubbleThickness * warpBubbleRadius;
-						var sigmaBack = warpBubbleThickness * (rs - warpBubbleRadius);
-						var tanhSigmaCenter = tanh(sigmaCenter);
-						var f = (tanh(sigmaFront) - tanh(sigmaBack)) / (2 * tanhSigmaCenter);
-						var sechDiff = sechSq(sigmaFront) - sechSq(sigmaBack);
-						var dfScalar = sechDiff / (2 * rs * tanhSigmaCenter);
-						var ft = -warpBubbleVelocity * warpBubbleThickness * oldPx * dfScalar;
-						var fx = warpBubbleThickness * oldPx * dfScalar;
-						var fy = warpBubbleThickness * oldPy * dfScalar;
-						var fz = warpBubbleThickness * oldPz * dfScalar;
+						let rs = Math.sqrt((oldPx - objectDist) * (oldPx - objectDist) + oldPy * oldPy + oldPz * oldPz);
+						let sigmaFront = warpBubbleThickness * (rs + warpBubbleRadius);
+						let sigmaCenter = warpBubbleThickness * warpBubbleRadius;
+						let sigmaBack = warpBubbleThickness * (rs - warpBubbleRadius);
+						let tanhSigmaCenter = tanh(sigmaCenter);
+						let f = (tanh(sigmaFront) - tanh(sigmaBack)) / (2 * tanhSigmaCenter);
+						let sechDiff = sechSq(sigmaFront) - sechSq(sigmaBack);
+						let dfScalar = sechDiff / (2 * rs * tanhSigmaCenter);
+						let ft = -warpBubbleVelocity * warpBubbleThickness * oldPx * dfScalar;
+						let fx = warpBubbleThickness * oldPx * dfScalar;
+						let fy = warpBubbleThickness * oldPy * dfScalar;
+						let fz = warpBubbleThickness * oldPz * dfScalar;
 				
 						//if I ever choose to keep track of v^t...
 						newVt = oldVt - deltaLambda * (f * f * fx * warpBubbleVelocity * warpBubbleVelocity * warpBubbleVelocity * oldVt * oldVt
@@ -298,7 +293,7 @@ void main() {
 					lightBuf[srci++] = newVt;
 					//don't bother update vw, I don't store it and just reset it afterwards
 					//copy floats to uint8 texture
-					var s = Math.sqrt(newVx * newVx + newVy * newVy + newVz * newVz);
+					let s = Math.sqrt(newVx * newVx + newVy * newVy + newVz * newVz);
 					lightVelTexData[side][dsti++]  = 255 * (newVx / s * .5 + .5);
 					lightVelTexData[side][dsti++]  = 255 * (newVy / s * .5 + .5);
 					lightVelTexData[side][dsti++]  = 255 * (newVz / s * .5 + .5);
@@ -306,8 +301,8 @@ void main() {
 			},
 			done : function() {
 				gl.bindTexture(gl.TEXTURE_CUBE_MAP, thiz.lightVelTex.obj);
-				for (var side = 0; side < 6; ++side) {
-					var target = thiz.lightVelTex.getTargetForSide(side);
+				for (let side = 0; side < 6; ++side) {
+					let target = thiz.lightVelTex.getTargetForSide(side);
 					gl.texSubImage2D(target, 0, 0, 0, thiz.lightTexWidth, thiz.lightTexHeight, gl.RGB, gl.UNSIGNED_BYTE, thiz.lightVelTexData[side]);
 				}
 				gl.generateMipmap(gl.TEXTURE_CUBE_MAP);
@@ -316,10 +311,21 @@ void main() {
 				thiz.updateLightVelTex();	
 			}
 		});
-	},
-
-	update : function() {
-		this.glutil.draw();
 	}
-});
 
+	update() {
+		glutil.draw();
+	}
+}
+
+GeodesicSWRenderer.prototype.updateInterval = undefined;
+
+//I'm updating in software, so on my tablet 512 is a bit slow
+//if I stop iteration after reaching a steady state, maybe I'll up resolution then
+//...or do some sort of adaptive thing ...
+GeodesicSWRenderer.prototype.lightTexWidth = 256;
+GeodesicSWRenderer.prototype.lightTexHeight = 256;
+
+return GeodesicSWRenderer;
+}
+export {makeGeodesicSWRenderer};

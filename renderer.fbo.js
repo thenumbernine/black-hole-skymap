@@ -1,22 +1,30 @@
-GeodesicFBORenderer = makeClass({
-	//1024x1024 is just too big for my current card to handle
-	lightTexWidth : 512,
-	lightTexHeight : 512,
-	lightPosVelChannels : [
-		{pos_or_vel:'pos'},
-		{pos_or_vel:'vel'}
-	],
-	
-	init : function(glutil) {
-		this.glutil = glutil;
-		if (!this.glutil.context.getExtension('OES_texture_float')) {
-			throw 'This requires OES_texture_float';
+import {mat3} from '/js/gl-matrix-3.4.1/index.js';
+import {makeUnitQuad} from '/js/gl-util-UnitQuad.js';
+function makeGeodesicFBORenderer(_G) {
+const glutil = _G.glutil;
+glutil.import('UnitQuad', makeUnitQuad);
+const gl = glutil.context;
+class GeodesicFBORenderer {
+	constructor() {
+		if (glutil.contextName == 'webgl2') {
+			if (!gl.getExtension('EXT_color_buffer_float')) {
+				throw 'This requires EXT_color_buffer_float';
+			}
+		} else {
+			/*
+			if (!gl.getExtension('WEBGL_color_buffer_float')) {
+				throw 'This requires WEBGL_color_buffer_float';
+			}
+			*/
+			if (!gl.getExtension('OES_texture_float')) {
+				throw 'This requires OES_texture_float';
+			}
 		}
-	},
+	}
 	
-	initScene : function(skyTex) {
-		var thiz = this;
-		$.each(thiz.lightPosVelChannels, function(_,channel) {
+	initScene(skyTex) {
+		const thiz = this;
+		thiz.lightPosVelChannels.forEach(channel => {
 			//working on how to organize this
 			channel.uniforms = [
 				'blackHoleMass', 
@@ -33,14 +41,14 @@ GeodesicFBORenderer = makeClass({
 			
 			channel.texs = [];
 			channel.fbos = [];
-			for (var history = 0; history < 2; ++history) {
-				var texs = [];
+			for (let history = 0; history < 2; ++history) {
+				const texs = [];
 				channel.texs[history] = texs;
-				var fbos = [];
+				const fbos = [];
 				channel.fbos[history] = fbos;
-				for (var side = 0; side < 6; ++side) {
-					var tex = new thiz.glutil.Texture2D({
-						internalFormat : gl.RGBA,
+				for (let side = 0; side < 6; ++side) {
+					const tex = new glutil.Texture2D({
+						internalFormat : gl.RGBA32F,
 						format : gl.RGBA,
 						type : gl.FLOAT,
 						width : thiz.lightTexWidth,
@@ -54,7 +62,7 @@ GeodesicFBORenderer = makeClass({
 					});
 					texs[side] = tex;
 					
-					var fbo = new thiz.glutil.Framebuffer();
+					const fbo = new glutil.Framebuffer();
 					gl.bindFramebuffer(gl.FRAMEBUFFER, fbo.obj);
 					gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, tex.obj, 0);
 					gl.bindFramebuffer(gl.FRAMEBUFFER, null);
@@ -64,7 +72,7 @@ GeodesicFBORenderer = makeClass({
 			
 			channel.shaders = {};
 
-			var metricCodes = {
+			let metricCodes = {
 /*
 eh wikipedia ...
 https://en.wikipedia.org/wiki/Derivation_of_the_Schwarzschild_solution
@@ -81,7 +89,7 @@ https://descanso.jpl.nasa.gov/monograph/series2/Descanso2_all.pdf
 yes, the isotropic 'rho' (not equal to the Schwarzschild-spherical 'r')
 is what NASA interprets as ordinary euclidian distance
 */
-				['Schwarzschild Black Hole'] : mlstr(function(){/*
+				['Schwarzschild Black Hole'] : `
 uniform float blackHoleMass;
 
 //common variables used by 
@@ -144,12 +152,12 @@ vec4 accel(metricInfo_t m, vec4 pos, vec4 vel) {
 	return result;
 }
 
-*/}),
+`,
 				
 				// substitution of a=0, Q=0, simlpified
 				// This somewhat match the Schwarzschild isotropic geodesic above
 				// The full Kerr geodesic below isn't working.
-				['Kerr Black Hole degeneracy'] : mlstr(function(){/*
+				['Kerr Black Hole degeneracy'] : `
 uniform float blackHoleMass;
 uniform float blackHoleCharge;
 uniform float blackHoleAngularVelocity;
@@ -209,10 +217,10 @@ vec4 accel(metricInfo_t m, vec4 pos, vec4 vel) {
 	return -neg_accel;
 }
 
-*/}),
+`,
 
 
-				['Kerr Black Hole'] : mlstr(function(){/*
+				['Kerr Black Hole'] : `
 uniform float blackHoleMass;
 uniform float blackHoleCharge;
 uniform float blackHoleAngularVelocity;
@@ -341,10 +349,10 @@ vec4 accel(metricInfo_t m, vec4 pos, vec4 vel) {
 		-conn_vel_vel.w + 2. * H * conn_vel_vel_lU);
 #endif
 }
-*/}),
+`,
 		
 				
-				['Kerr Black Hole full'] : mlstr(function(){/*
+				['Kerr Black Hole full'] : `
 uniform float blackHoleMass;
 uniform float blackHoleCharge;
 uniform float blackHoleAngularVelocity;
@@ -514,9 +522,9 @@ vec4 accel(metricInfo_t m, vec4 pos, vec4 vel) {
 	// conn^a_bc = g^ad conn_dbc
 	return -gInv * conn_vel_vel;
 }
-*/}),
+`,
 				
-				['Alcubierre Warp Drive Bubble'] : mlstr(function(){/*
+				['Alcubierre Warp Drive Bubble'] : `
 uniform float warpBubbleThickness;
 uniform float warpBubbleVelocity;
 uniform float warpBubbleRadius;
@@ -586,55 +594,53 @@ vec4 accel(metricInfo_t m, vec4 pos, vec4 vel) {
 	return result;
 }
 
-*/})		
+`
 			};
 					
-			$.each(objectTypes, function(_,objType) {
-				var pos_or_vel = channel.pos_or_vel;
+			_G.objectTypes.forEach(objType => {
+				let pos_or_vel = channel.pos_or_vel;
 				
 				channel.shaders[objType] = {};
 
-				var shaderTypes = ['reset', 'iterate'];
-				
-				$.each(shaderTypes, function(_,shaderType) {
-					
-					var vsh = [];
-					var fsh = [shaderCommonCode];
+				['reset', 'iterate'].forEach(shaderType => {
+					let vsh = [];
+					let fsh = [_G.shaderCommonCode];
 
-					fsh.push(mlstr(function(){/*
+					fsh.push(`
 uniform float objectDist;
 uniform vec4 objectAngle;
 
 vec4 calc_pos0() {
 	vec4 pos = vec4(-objectDist, 0., 0., 0.);
-	pos.xyz = quatRotate(quatConj(objectAngle), pos.xyz);
+	pos.xyz = quatRotate(objectAngle, pos.xyz);
 	return pos;
 }
 
-*/}));
+`);
 
 					if (shaderType == 'reset') {
 						
 						//new
-						vsh.push(mlstr(function(){/*
-attribute vec2 vertex;
-varying vec3 vtxv;
+						vsh.push(`
+in vec2 vertex;
+out vec3 vtxv;
 uniform mat3 rotation;
 void main() {
 	vtxv = rotation * vec3(vertex * 2. - 1., 1.);
 	gl_Position = vec4(vertex * 2. - 1., 0., 1.);
 }
-*/}));
+`);
 						if (pos_or_vel == 'pos') {
-							fsh.push(mlstr(function(){/*
-varying vec3 vtxv;
+							fsh.push(`
+out vec4 fragColor;
+in vec3 vtxv;
 void main() {
-	gl_FragColor = calc_pos0();
+	fragColor = calc_pos0();
 }
-*/}));
+`);
 						} else if (pos_or_vel == 'vel') {
 							fsh.push(metricCodes[objType]);
-							fsh.push(mlstr(function(){/*
+							fsh.push(`
 
 //when initializing our metric:
 //g_ab v^a v^b = 0 for our metric g
@@ -657,93 +663,94 @@ float reset_w(vec4 pos, vec4 vel) {
 //relies on objectAngle
 vec4 calc_vel0(vec4 pos, vec3 vtxv) {
 	vec4 vel = vec4(normalize(vtxv.xyz), 0.);
-	vel.xyz = quatRotate(quatConj(objectAngle), vel.xyz);
+	vel.xyz = quatRotate(objectAngle, vel.xyz);
 	vel.w = reset_w(pos, vel);
 	return vel;
 }
 
-varying vec3 vtxv;
+out vec4 fragColor;
+in vec3 vtxv;
 void main() {
 	vec4 pos = calc_pos0();
-	gl_FragColor = calc_vel0(pos, vtxv.xyz);	
+	fragColor = calc_vel0(pos, vtxv.xyz);	
 }
-*/}));
+`);
 						}
 					} else if (shaderType == 'iterate') {
-						vsh.push(mlstr(function(){/*
-varying vec2 uv;
-varying vec3 vtxv;
-attribute vec2 vertex;
+						vsh.push(`
+out vec2 uv;
+out vec3 vtxv;
+in vec2 vertex;
 uniform mat3 rotation;
 void main() {
 	uv = vertex;
 	vtxv = rotation * vec3(vertex * 2. - 1., 1.);
 	gl_Position = vec4(vertex * 2. - 1., 0., 1.);
 }
-*/}));
-						fsh.push(mlstr(function(){/*
-varying vec2 uv;
-varying vec3 vtxv;
+`);
+						fsh.push(`
+in vec2 uv;
+in vec3 vtxv;
 uniform float deltaLambda;
 uniform sampler2D lightPosTex;
 uniform sampler2D lightVelTex;
-*/}));
+`);
 						if (pos_or_vel == 'vel') {
 							fsh.push(metricCodes[objType]);
 						}
 					
-						fsh.push(mlstr(function(){/*
+						fsh.push(`
 #define maxRadius 1e+6
 
+out vec4 fragColor;
 void main() {
-	vec4 pos = texture2D(lightPosTex, uv);
-	vec4 vel = texture2D(lightVelTex, uv);
+	vec4 pos = texture(lightPosTex, uv);
+	vec4 vel = texture(lightVelTex, uv);
 
-*/}));
+`);
 						if (pos_or_vel == 'pos') {
-							fsh.push(mlstr(function(){/*
+							fsh.push(`
 	float distSq = dot(pos.xyz, pos.xyz);
-	gl_FragColor = pos;
+	fragColor = pos;
 	if (distSq < maxRadius) {
-		gl_FragColor += deltaLambda * vel;
-		if (gl_FragColor != gl_FragColor) {
-			gl_FragColor = pos;
+		fragColor += deltaLambda * vel;
+		if (fragColor != fragColor) {
+			fragColor = pos;
 		}
 	}
 }
-*/}));
+`);
 						} else if (pos_or_vel == 'vel') {
-							fsh.push(mlstr(function(){/*
+							fsh.push(`
 	float distSq = dot(pos.xyz, pos.xyz);
-	gl_FragColor = vel;
+	fragColor = vel;
 	if (distSq < maxRadius) {
-		gl_FragColor += deltaLambda * accel(init_metricInfo(pos), pos, vel);
+		fragColor += deltaLambda * accel(init_metricInfo(pos), pos, vel);
 	}
 }
-*/}));
+`);
 						}
 					}
 
-					var args = {
+					let args = {
 						vertexCode : vsh.join('\n'),
 						fragmentCode : fsh.join('\n'),
 					};
 
-					args.context = thiz.glutil.context;
+					args.context = gl;
 					args.uniforms = {
 						lightPosTex : 0,
 						lightVelTex : 1
 					};
-					args.vertexPrecision = 'best';
-					args.fragmentPrecision = 'best';
-					channel.shaders[objType][shaderType] = new thiz.glutil.ShaderProgram(args);
+//console.log('objType', objType, 'shaderType', shaderType);					
+					channel.shaders[objType][shaderType] = new glutil.Program(args);
 				});
 			});
 		});
 
-		var cubeVertexCode = shaderCommonCode + mlstr(function(){/*
-attribute vec2 vertex;
-varying vec2 uv;
+		let cubeVertexCode = _G.shaderCommonCode + `
+in vec2 vertex;
+out vec2 uv;
 uniform mat4 projMat;
 uniform vec4 angle;
 
@@ -755,22 +762,22 @@ const mat3 viewMatrix = mat3(
 void main() {
 	uv = vertex;
 	vec3 vtx3 = vec3(vertex * 2. - 1., 1.);
-	vtx3 = quatRotate(vec4(angle.xyz, -angle.w), vtx3);
+	vtx3 = quatRotate(angle, vtx3);
 	vtx3 = viewMatrix * vtx3;
 	vec4 vtx4 = vec4(vtx3, 1.);
 	gl_Position = projMat * vtx4;
 }
-*/});
+`;
 
-		var cubeShaderUniforms = {
+		let cubeShaderUniforms = {
 			skyTex : 0,
 			lightPosTex : 1,
 			lightVelTex : 2,
 			hsvTex : 3
 		};
 
-		var cubeFragmentHeader = shaderCommonCode + mlstr(function(){/*
-varying vec2 uv;
+		let cubeFragmentHeader = _G.shaderCommonCode + `
+in vec2 uv;
 uniform samplerCube skyTex;
 uniform sampler2D lightPosTex;
 uniform sampler2D lightVelTex;
@@ -780,89 +787,84 @@ const mat3 viewMatrixInv = mat3(
 	0., 1., 0.,
 	0., 0., -1.,
 	-1., 0., 0.);
-*/});
+`;
 
-		cubeBackgroundShader = new this.glutil.ShaderProgram({
-			vertexPrecision : 'best',
-			fragmentPrecision : 'best',
+		this.cubeBackgroundShader = new glutil.Program({
 			uniforms : cubeShaderUniforms,
 			vertexCode : cubeVertexCode,
-			fragmentCode : cubeFragmentHeader + mlstr(function(){/*
+			fragmentCode : cubeFragmentHeader + `
+out vec4 fragColor;
 void main() {
-	vec3 dir = texture2D(lightVelTex, uv).xyz;
+	vec3 dir = texture(lightVelTex, uv).xyz;
 	dir = viewMatrixInv * viewMatrixInv * dir;
-	dir = quatRotate(viewAngle, dir);
-	gl_FragColor = vec4(textureCube(skyTex, dir).xyz, 1.);
+	dir = quatRotate(quatConj(viewAngle), dir);
+	fragColor = vec4(texture(skyTex, dir).xyz, 1.);
 }
-*/})
+`
 		});
 		
-		cubePosXYZShader = new this.glutil.ShaderProgram({
-			vertexPrecision : 'best',
-			fragmentPrecision : 'best',
+		this.cubePosXYZShader = new glutil.Program({
 			uniforms : cubeShaderUniforms,
 			vertexCode : cubeVertexCode,
-			fragmentCode : cubeFragmentHeader + mlstr(function(){/*
+			fragmentCode : cubeFragmentHeader + `
+out vec4 fragColor;
 void main() {
-	vec3 pos = texture2D(lightPosTex, uv).xyz;
+	vec3 pos = texture(lightPosTex, uv).xyz;
 	pos = normalize(pos);
 	pos = viewMatrixInv * viewMatrixInv * pos;
-	pos = quatRotate(viewAngle, pos);
-	gl_FragColor = vec4(.5 + .5 * pos.xyz, 1.);
+	pos = quatRotate(quatConj(viewAngle), pos);
+	fragColor = vec4(.5 + .5 * pos.xyz, 1.);
 }
-*/})
+`
 		});
 
-		cubeVelXYZShader = new this.glutil.ShaderProgram({
-			vertexPrecision : 'best',
-			fragmentPrecision : 'best',
+		this.cubeVelXYZShader = new glutil.Program({
 			uniforms : cubeShaderUniforms,
 			vertexCode : cubeVertexCode,
-			fragmentCode : cubeFragmentHeader + mlstr(function(){/*
+			fragmentCode : cubeFragmentHeader + `
+out vec4 fragColor;
 void main() {
-	vec3 dir = texture2D(lightVelTex, uv).xyz;
+	vec3 dir = texture(lightVelTex, uv).xyz;
 	dir = normalize(dir);
 	dir = viewMatrixInv * viewMatrixInv * dir;
-	dir = quatRotate(viewAngle, dir);
-	gl_FragColor = vec4(.5 + .5 * dir, 1.);
+	dir = quatRotate(quatConj(viewAngle), dir);
+	fragColor = vec4(.5 + .5 * dir, 1.);
 }
-*/})
+`
 		});
 
 
-		cubePosTShader = new this.glutil.ShaderProgram({
-			vertexPrecision : 'best',
-			fragmentPrecision : 'best',
+		this.cubePosTShader = new glutil.Program({
 			uniforms : cubeShaderUniforms,
 			vertexCode : cubeVertexCode,
-			fragmentCode : cubeFragmentHeader + mlstr(function(){/*
+			fragmentCode : cubeFragmentHeader + `
 uniform float simTime;	//lambda
 uniform sampler2D hsvTex;
+out vec4 fragColor;
 void main() {
-	vec4 pos = texture2D(lightPosTex, uv);
+	vec4 pos = texture(lightPosTex, uv);
 	float t = pos.w;
 	float ratio = t / simTime;	//global time / local time
 	float r = .5 * log(ratio);
-	gl_FragColor = texture2D(hsvTex, vec2(r, .5));
+	fragColor = texture(hsvTex, vec2(r, .5));
 }
-*/})
+`
 		});
 
-		cubeVelTShader = new this.glutil.ShaderProgram({
-			vertexPrecision : 'best',
-			fragmentPrecision : 'best',
+		this.cubeVelTShader = new glutil.Program({
 			uniforms : cubeShaderUniforms,
 			vertexCode : cubeVertexCode,
-			fragmentCode : cubeFragmentHeader + mlstr(function(){/*
+			fragmentCode : cubeFragmentHeader + `
 uniform sampler2D hsvTex;
+out vec4 fragColor;
 void main() {
-	vec4 vel = texture2D(lightVelTex, uv);
+	vec4 vel = texture(lightVelTex, uv);
 	// TODO divide by the original vel.w, which is g_tt of the initial position ...
 	float vt = vel.w;
 	float r = .5 * log(vt);
-	gl_FragColor = texture2D(hsvTex, vec2(r, .5));
+	fragColor = texture(hsvTex, vec2(r, .5));
 }
-*/})
+`
 		});
 
 
@@ -871,84 +873,84 @@ void main() {
 		//scene graph, 6 quads oriented in a cube
 		//I would use a cubemap but the Mali-400 doesn't seem to want to use them as 2D FBO targets ...
 		this.cubeSides = [];
-		for (var side = 0; side < 6; ++side) {
-			this.cubeSides[side] = new this.glutil.SceneObject({
-				//geometry : glutil.unitQuad.geometry,
+		for (let side = 0; side < 6; ++side) {
+			this.cubeSides[side] = new glutil.SceneObject({
+				//geometry : glutil.UnitQuad.unitQuad.geometry,
 				mode : gl.TRIANGLE_STRIP,
 				attrs : {
-					vertex : glutil.unitQuadVertexBuffer
+					vertex : glutil.UnitQuad.unitQuadVertexBuffer
 				},
 				uniforms : {
-					viewAngle : this.glutil.view.angle,
-					angle : angleForSide[side]
+					viewAngle : glutil.view.angle,
+					angle : _G.angleForSide[side]
 				},
-				shader : cubeBackgroundShader,
+				shader : this.cubeBackgroundShader,
 				texs : [
 					skyTex,
 					this.lightPosVelChannels[0].texs[0][side],
 					this.lightPosVelChannels[1].texs[0][side],
-					hsvTex
+					_G.hsvTex,
 				],
 			});
 		}
-	},
+	}
 
-	resetField : function() {
-		simTime = 0;
+	resetField() {
+		_G.simTime = 0;
 		gl.viewport(0, 0, this.lightTexWidth, this.lightTexHeight);
-		$.each(this.lightPosVelChannels, function(_,channel) {
-			for (var side = 0; side < 6; ++side) {
-				var shader = channel.shaders[objectType].reset;
+		this.lightPosVelChannels.forEach(channel => {
+			for (let side = 0; side < 6; ++side) {
+				const shader = channel.shaders[_G.objectType].reset;
 				
-				var uniforms = {};
+				const uniforms = {};
 				if (channel.uniforms !== undefined) {
-					for (var i = 0; i < channel.uniforms.length; ++i) {
-						var uniformName = channel.uniforms[i];
-						uniforms[uniformName] = window[uniformName];
+					for (let i = 0; i < channel.uniforms.length; ++i) {
+						const uniformName = channel.uniforms[i];
+						uniforms[uniformName] = _G[uniformName];
 					}
 				}
-				var rotationMat3 = mat3.create();
-				mat3.fromQuat(rotationMat3, angleForSide[side]);
+				const rotationMat3 = mat3.create();
+				mat3.fromQuat(rotationMat3, _G.angleForSide[side]);
 				uniforms.rotation = rotationMat3;
 				
-				var fbo = channel.fbos[0][side];
+				const fbo = channel.fbos[0][side];
 				fbo.draw({
-					callback:function(){
-						glutil.unitQuad.draw({
+					callback:()=>{
+						glutil.UnitQuad.unitQuad.draw({
 							shader:shader,
-							uniforms:uniforms
+							uniforms:uniforms,
 						});
 					}
 				});
 			}
 		});
-		gl.viewport(0, 0, this.glutil.canvas.width, this.glutil.canvas.height);
-	},
+		gl.viewport(0, 0, glutil.canvas.width, glutil.canvas.height);
+	}
 	
-	updateLightPosTex : function() {	
-		var thiz = this;
+	updateLightPosTex() {	
+		let thiz = this;
 		gl.viewport(0, 0, this.lightTexWidth, this.lightTexHeight);
-		$.each(this.lightPosVelChannels, function(_,channel) {
-			for (var side = 0; side < 6; ++side) {
-				var shader = channel.shaders[objectType].iterate;
+		this.lightPosVelChannels.forEach(channel => {
+			for (let side = 0; side < 6; ++side) {
+				const shader = channel.shaders[_G.objectType].iterate;
 				
-				var uniforms = {};
+				const uniforms = {};
 				if (channel.uniforms !== undefined) {
-					for (var i = 0; i < channel.uniforms.length; ++i) {
-						var uniformName = channel.uniforms[i];
-						uniforms[uniformName] = window[uniformName];
+					for (let i = 0; i < channel.uniforms.length; ++i) {
+						const uniformName = channel.uniforms[i];
+						uniforms[uniformName] = _G[uniformName];
 					}
 				}
-				var rotationMat3 = mat3.create();
-				mat3.fromQuat(rotationMat3, angleForSide[side]);
+				const rotationMat3 = mat3.create();
+				mat3.fromQuat(rotationMat3, _G.angleForSide[side]);
 				uniforms.rotation = rotationMat3;
 				uniforms.lightPosTex = 0;
 				uniforms.lightVelTex = 1;
 				
-				var fbo = channel.fbos[1][side];
+				const fbo = channel.fbos[1][side];
 				fbo.draw({
 					callback:function(){
-						glutil.unitQuad.draw({
+						glutil.UnitQuad.unitQuad.draw({
 							shader:shader,
 							uniforms:uniforms,
 							texs:[
@@ -960,9 +962,9 @@ void main() {
 				});
 			}
 		});
-		gl.viewport(0, 0, this.glutil.canvas.width, this.glutil.canvas.height);
-		$.each(this.lightPosVelChannels, function(_,channel) {
-			var tmp;
+		gl.viewport(0, 0, glutil.canvas.width, glutil.canvas.height);
+		this.lightPosVelChannels.forEach(channel => {
+			let tmp;
 			tmp = channel.texs[0];
 			channel.texs[0] = channel.texs[1];
 			channel.texs[1] = tmp;
@@ -970,19 +972,17 @@ void main() {
 			channel.fbos[0] = channel.fbos[1];
 			channel.fbos[1] = tmp;
 		});
-	},
+	}
 
-	runSimulation : true,
-
-	update : function() {
-		if (skyboxRenderer.runSimulation) {
+	update() {
+		if (this.runSimulation) {
 			this.updateLightPosTex();
-			simTime += deltaLambda;
+			_G.simTime += _G.deltaLambda;
 		}
 		
 		//turn on magnification filter
-		for (var side = 0; side < 6; ++side) {
-			var tex = this.lightPosVelChannels[1].texs[0][side].obj;
+		for (let side = 0; side < 6; ++side) {
+			let tex = this.lightPosVelChannels[1].texs[0][side].obj;
 			gl.bindTexture(gl.TEXTURE_2D, tex);
 			gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
 			//gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR);
@@ -990,7 +990,7 @@ void main() {
 			gl.bindTexture(gl.TEXTURE_2D, null);
 		}
 		
-		for (var side = 0; side < 6; ++side) {
+		for (let side = 0; side < 6; ++side) {
 			//texs[0] is skyTex
 			this.cubeSides[side].texs[1] = this.lightPosVelChannels[0].texs[0][side];
 			this.cubeSides[side].texs[2] = this.lightPosVelChannels[1].texs[0][side];
@@ -998,35 +998,49 @@ void main() {
 		}
 
 		//if we are drawing the background (skytex lookup) ...
-		var shader;
-		if (drawMethod == 'background') {
-			shader = cubeBackgroundShader;
-		} else if (drawMethod == 'pos_xyz') {
-			shader = cubePosXYZShader;
-		} else if (drawMethod == 'vel_xyz') {
-			shader = cubeVelXYZShader;
-		} else if (drawMethod == 'pos_t') {
-			shader = cubePosTShader;
-		} else if (drawMethod == 'vel_t') {
-			shader = cubeVelTShader;
+		let shader;
+		if (_G.drawMethod == 'background') {
+			shader = this.cubeBackgroundShader;
+		} else if (_G.drawMethod == 'pos_xyz') {
+			shader = this.cubePosXYZShader;
+		} else if (_G.drawMethod == 'vel_xyz') {
+			shader = this.cubeVelXYZShader;
+		} else if (_G.drawMethod == 'pos_t') {
+			shader = this.cubePosTShader;
+		} else if (_G.drawMethod == 'vel_t') {
+			shader = this.cubeVelTShader;
 		}
-		for (var side = 0; side < 6; ++side) {
+		for (let side = 0; side < 6; ++side) {
 			this.cubeSides[side].shader = shader;
 			
 			//the only dynamic variable
-			this.cubeSides[side].uniforms.simTime = simTime;
+			this.cubeSides[side].uniforms.simTime = _G.simTime;
 		}
 
-		this.glutil.draw();	
+		glutil.draw();	
 		
 		//turn off magnification filter
-		for (var side = 0; side < 6; ++side) {
-			var tex = this.lightPosVelChannels[1].texs[0][side].obj;
+		for (let side = 0; side < 6; ++side) {
+			let tex = this.lightPosVelChannels[1].texs[0][side].obj;
 			gl.bindTexture(gl.TEXTURE_2D, tex);
 			gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
 			//gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
 			gl.bindTexture(gl.TEXTURE_2D, null);
 		}	
 	}
-});
+}
 
+//statics here cuz js is dumb
+
+//1024x1024 is just too big for my current card to handle
+GeodesicFBORenderer.prototype.lightTexWidth = 512;
+GeodesicFBORenderer.prototype.lightTexHeight = 512;
+GeodesicFBORenderer.prototype.lightPosVelChannels = [
+	{pos_or_vel:'pos'},
+	{pos_or_vel:'vel'}
+];
+GeodesicFBORenderer.prototype.runSimulation = true;
+
+return GeodesicFBORenderer;
+}
+export {makeGeodesicFBORenderer};

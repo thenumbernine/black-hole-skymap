@@ -1,50 +1,65 @@
-var glMaxCubeMapTextureSize;
-var canvas;
-var gl;
-var glutil;
+import {mat4, quat} from '/js/gl-matrix-3.4.1/index.js';
+import {assert, assertExists} from '/js/util.js';
+import {DOM, getIDs, removeFromParent, preload, hide, show, hidden} from '/js/util.js';
+import {GLUtil} from '/js/gl-util.js';
+import {Mouse3D} from '/js/mouse3d.js';
+import {makeTextureCube} from '/js/gl-util-TextureCube.js';
+import {makeGradient} from '/js/gl-util-Gradient.js';
+import {makeGeodesicFBORenderer} from './renderer.fbo.js';
+import {makeGeodesicSWRenderer} from './renderer.sw.js';
+import {makeGeodesicTestCubeRenderer} from './renderer.testcube.js';
 
-var objectTypes = [
+const ids = getIDs();
+window.ids = ids;
+
+const urlparams = new URLSearchParams(window.location.search);
+
+// putting all these here cuz both the renderer and the UI callbacks want a named table
+const _G = {};
+window._G = _G;
+
+let canvas;
+let gl;
+let glutil;
+
+const objectTypes = [
 	'Schwarzschild Black Hole',	
 	'Kerr Black Hole degeneracy',	
 	'Kerr Black Hole',	
 	'Alcubierre Warp Drive Bubble',
 ];
-var objectType = objectTypes[0];
-var objectDist = 10;
-var blackHoleMass = .5;
-var blackHoleCharge = 0.;
-var blackHoleAngularVelocity = 0.;
+_G.objectTypes = objectTypes;
+_G.objectType = objectTypes[0];
+_G.objectDist = 10;
+_G.blackHoleMass = .5;
+_G.blackHoleCharge = 0.;
+_G.blackHoleAngularVelocity = 0.;
 
-var warpBubbleThickness = .01;
-var warpBubbleVelocity = 1.5;
-var warpBubbleRadius = 1;
+_G.warpBubbleThickness = .01;
+_G.warpBubbleVelocity = 1.5;
+_G.warpBubbleRadius = 1;
 
-var deltaLambda = 1;	//ray forward iteration
-var simTime = 0;
+_G.deltaLambda = 1;	//ray forward iteration
+_G.simTime = 0;
 
-var ident4 = mat4.create();
+let ident4 = mat4.create();
 
 function tanh(x) {
-	var exp2x = Math.exp(2 * x);
+	let exp2x = Math.exp(2 * x);
 	return (exp2x - 1) / (exp2x + 1);
 }
 
 function sech(x) {
-	var expx = Math.exp(x);
+	let expx = Math.exp(x);
 	return 2. * expx / (expx * expx + 1.);
 }
 
 function sechSq(x) {
-	var y = sech(x);
+	let y = sech(x);
 	return y * y;
 }
 
-var shaderCommonCode = mlstr(function(){/*
-float tanh(float x) {
-	float exp2x = exp(2. * x);
-	return (exp2x - 1.) / (exp2x + 1.);
-}
-
+_G.shaderCommonCode = `
 float sech(float x) {
 	float expx = exp(x);
 	return 2. * expx / (expx * expx + 1.);
@@ -55,44 +70,6 @@ float sechSq(float x) {
 	return y * y;
 }
 
-mat3 outerProduct(vec3 a, vec3 b) {
-	return mat3(
-		vec3(a.x * b.x, a.x * b.y, a.x * b.z),
-		vec3(a.y * b.x, a.y * b.y, a.y * b.z),
-		vec3(a.z * b.x, a.z * b.y, a.z * b.z)
-	);
-}
-
-mat4 outerProduct(vec4 a, vec4 b) {
-	return mat4(
-		vec4(a.x * b.x, a.x * b.y, a.x * b.z, a.x * b.w),
-		vec4(a.y * b.x, a.y * b.y, a.y * b.z, a.y * b.w),
-		vec4(a.z * b.x, a.z * b.y, a.z * b.z, a.z * b.w),
-		vec4(a.w * b.x, a.w * b.y, a.w * b.z, a.w * b.w)
-	);
-}
-
-mat4 transpose(mat4 m) {
-	mat4 r;
-	r[0][0] = m[0][0];
-	r[1][0] = m[0][1];
-	r[2][0] = m[0][2];
-	r[3][0] = m[0][3];
-	r[0][1] = m[1][0];
-	r[1][1] = m[1][1];
-	r[2][1] = m[1][2];
-	r[3][1] = m[1][3];
-	r[0][2] = m[2][0];
-	r[1][2] = m[2][1];
-	r[2][2] = m[2][2];
-	r[3][2] = m[2][3];
-	r[0][3] = m[3][0];
-	r[1][3] = m[3][1];
-	r[2][3] = m[3][2];
-	r[3][3] = m[3][3];
-	return r;
-}
-
 vec3 quatRotate(vec4 q, vec3 v) { 
 	return v + 2. * cross(cross(v, q.xyz) - q.w * v, q.xyz);
 }
@@ -100,19 +77,19 @@ vec3 quatRotate(vec4 q, vec3 v) {
 vec4 quatConj(vec4 q) {
 	return vec4(q.xyz, -q.w);
 }
-*/});
+`;
 
 function stupidPrint(s) {
 /*
-	$.each(s.split('\n'), function(_,l) {
+	s.split('\n').forEach(l => {
 		console.log(l);
 	});
 */
 }
 
-var SQRT_1_2 = Math.sqrt(.5);
+const SQRT_1_2 = Math.sqrt(.5);
 //forward-transforming (object rotations)
-var angleForSide = [
+_G.angleForSide = [
 	[0, -SQRT_1_2, 0, -SQRT_1_2],
 	[0, SQRT_1_2, 0, -SQRT_1_2],
 	[SQRT_1_2, 0, 0, -SQRT_1_2],
@@ -125,14 +102,14 @@ var angleForSide = [
 
 
 //names of all renderers
-var skyboxRendererClassNames = [
+const skyboxRendererClassNames = [
 	'GeodesicTestCubeRenderer',
 	'GeodesicSWRenderer',
-	'GeodesicFBORenderer'
+	'GeodesicFBORenderer',
 ];
 
-var skyboxRenderer;
-var skyboxRendererClassName;
+let skyboxRenderer;
+let skyboxRendererClassName;
 
 //I would like to eventually instanciate all renderers and allow them to be toggled at runtime
 //however courtesy of the scenegraph's globals (which I am not too happy about my current design), this will take a bit more work
@@ -143,86 +120,188 @@ function resize() {
 	canvas.height = window.innerHeight;
 	glutil.resize();
 
-	var info = $('#info');
-	var width = window.innerWidth 
-		- parseInt(info.css('padding-left'))
-		- parseInt(info.css('padding-right'));
-	info.width(width);
-	var height = window.innerHeight
-		- parseInt(info.css('padding-top'))
-		- parseInt(info.css('padding-bottom'));
-	info.height(height - 32);
+	let info = ids.info;
+	let width = window.innerWidth 
+		- parseInt(info.style.paddingLeft)
+		- parseInt(info.style.paddingRight);
+	info.style.width = width+'px';
+	let height = window.innerHeight
+		- parseInt(info.style.paddingTop)
+		- parseInt(info.style.paddingBottom);
+	info.style.height = (height - 32)+'px';
 }
 
 // render loop
 
 function update() {
 	skyboxRenderer.update();
-	requestAnimFrame(update);
+	requestAnimationFrame(update);
 };
 
-var mouseMethod = 'rotateCamera';
-//var mouseMethod = 'rotateObject';
+_G.mouseMethod = 'rotateCamera';
+//_G.mouseMethod = 'rotateObject';
 
-var drawMethod = 'background';
+_G.drawMethod = 'background';
 
-var mouse;
+let mouse;
 
-var objectAngle = quat.create();
+_G.objectAngle = quat.create();
 
-var initAngle = [];
-var initAngleInv = [];
+let initAngle = [];
+let initAngleInv = [];
 
-function main3(skyTex) {
-	skyboxRenderer.initScene(skyTex);
+const skyTexFilenames = [
+	'skytex/sky-visible-cube-xp.png',
+	'skytex/sky-visible-cube-xn.png',
+	'skytex/sky-visible-cube-yp.png',
+	'skytex/sky-visible-cube-yn.png',
+	'skytex/sky-visible-cube-zp.png',
+	'skytex/sky-visible-cube-zn.png',
+];
 
-	$('input[name="mouseMethod"]').click(function() { window[$(this).attr('name')] = $(this).val(); });
-	$('input[name="drawMethod"]').click(function() { window[$(this).attr('name')] = $(this).val(); });
+ids.panelButton.addEventListener('click', e => {
+	if (hidden(ids.panel)) {
+		show(ids.panel);
+		hide(ids.info);
+	} else {
+		hide(ids.panel);
+	}
+});
+ids.infoButton.addEventListener('click', e => {
+	if (hidden(ids.info)) {
+		show(ids.info);
+		hide(ids.panel);
+	} else {
+		hide(ids.info);
+	}
+});
 
-	var tmpQ = quat.create();	
-	mouse = new Mouse3D({
-		pressObj : canvas,
-		move : function(dx,dy) {
-			var rotAngle = Math.PI / 180 * .01 * Math.sqrt(dx*dx + dy*dy);
-			quat.setAxisAngle(tmpQ, [dy, dx, 0], rotAngle);
+canvas = DOM('canvas', {
+	css : {
+		left : 0,
+		top : 0,
+		position : 'absolute',
+		userSelect : 'none',
+	},
+	prependTo : document.body,
+});
+window.canvas = canvas;
 
-			if (mouseMethod == 'rotateCamera') {
-				quat.mul(glutil.view.angle, glutil.view.angle, tmpQ);
-				quat.normalize(glutil.view.angle, glutil.view.angle);
-			} else if (mouseMethod == 'rotateObject') {
-				//rotate into view space
-				quat.mul(tmpQ, tmpQ, initAngleInv);
-				quat.mul(tmpQ, initAngle, tmpQ);
-				quat.conjugate(tmpQ, tmpQ);
-
-				quat.mul(objectAngle, tmpQ, objectAngle);
-				quat.normalize(objectAngle, objectAngle);
-skyboxRenderer.resetField();
-			}
-		},
-		zoom : function(dz) {
-			glutil.view.fovY *= Math.exp(-.0003 * dz);
-			glutil.view.fovY = Math.clamp(glutil.view.fovY, 1, 179);
-			glutil.updateProjection();
+const objectTypeParamDivs = {};
+const refreshObjectTypeParamDivs = () => {
+	Object.entries(objectTypeParamDivs).forEach(entry => {
+		const [divObjectType, objectTypeParamDiv] = entry;
+		if (divObjectType == _G.objectType) {
+			show(objectTypeParamDiv);
+		} else {
+			hide(objectTypeParamDiv);
 		}
 	});
-	
-	
-	$('#runSimulation').click(function() {
-		skyboxRenderer.runSimulation = $('#runSimulation').is(':checked');
-	});
-	skyboxRenderer.runSimulation = $('#runSimulation').is(':checked');
-
+};
+objectTypes.forEach(v => {
+	const id = v.replace(new RegExp(' ', 'g'), '_')+'_params';
+	if (!(id in ids)) {
+		console.log("couldn't find params for ", v, id);
+		return;
+	}
+	objectTypeParamDivs[v] = ids[id];
+	const option = DOM('option', {text:v, appendTo:ids.objectTypes});
+	if (v == _G.objectType) {
+		option.setAttribute('selected', 'true');
+	}
+});
+ids.objectTypes.addEventListener('change', e => {
+	_G.objectType = ids.objectTypes.value;
+	refreshObjectTypeParamDivs();
 	skyboxRenderer.resetField();
+});
+refreshObjectTypeParamDivs();
 
-	$(window).resize(resize);
-	resize();
-	update();
+[
+	'deltaLambda',
+	'objectDist',
+	'blackHoleMass',
+	'blackHoleCharge',
+	'blackHoleAngularVelocity',
+	'warpBubbleThickness',
+	'warpBubbleVelocity',
+	'warpBubbleRadius'
+].forEach(v => {
+	const o = ids[v];
+	o.value = _G[v];
+	o.addEventListener('change', e => {
+		_G[v] = o.value*1;
+		o.dispatchEvent(new Event('blur'));
+	});
+});
+
+skyboxRendererClassName = 'GeodesicFBORenderer';
+let classname = urlparams.get('renderer');
+if (classname) {
+	skyboxRendererClassName = classname;
 }
+if (skyboxRendererClassNames.indexOf(skyboxRendererClassName) == -1) throw "unable to find skybox renderer named "+skyboxRendererClassName;
 
+skyboxRendererClassNames.forEach(name => {
+	if (!(name in ids)) {
+		console.log("couldn't find radio for ", name);
+		return;
+	}
+	const radio = ids[name];
+	// TODO recmbine but with this param exchanged, like in 4d-renderer
+	radio.addEventListener('click', e => {
+		location.href = 'index.html?renderer=' + name;
+	});
+	if (name == skyboxRendererClassName) radio.checked = false;
+});
 
-var main2Initialized = false;
-function main2() {
+try {
+	glutil = new GLUtil({canvas:canvas});
+	gl = glutil.context;
+} catch (e) {
+	removeFromParent(canvas);
+	show(ids.webglfail);
+	throw e;
+}
+show(ids.menu);
+show(ids.panel);
+glutil.import('Gradient', makeGradient);
+const glMaxCubeMapTextureSize = gl.getParameter(gl.MAX_CUBE_MAP_TEXTURE_SIZE);
+_G.glMaxCubeMapTextureSize = glMaxCubeMapTextureSize;
+
+const hsvTex = new glutil.Gradient.HSVTexture(256);
+hsvTex.bind();
+gl.texParameteri(hsvTex.target, gl.TEXTURE_WRAP_S, gl.REPEAT);
+hsvTex.unbind();
+_G.hsvTex = hsvTex;
+
+ids.reset.addEventListener('click', e => {
+	skyboxRenderer.resetField();
+});
+
+ids.reset_view.addEventListener('click', e => {
+	quat.copy(_G.objectAngle, quat.create());
+	quat.copy(glutil.view.angle, initAngle);
+	skyboxRenderer.resetField();
+});
+
+//classes themselves
+const rendererClassGen = {
+	GeodesicTestCubeRenderer : makeGeodesicTestCubeRenderer,
+	GeodesicSWRenderer : makeGeodesicSWRenderer,
+	GeodesicFBORenderer : makeGeodesicFBORenderer,
+};
+const classgen = assertExists(rendererClassGen, skyboxRendererClassName);
+
+_G.glutil = glutil;
+const cl = classgen(_G);
+skyboxRenderer = new cl();
+
+gl.disable(gl.DITHER);
+
+console.log('calling preload...');
+let main2Initialized = false;
+preload(skyTexFilenames, () => {
 	if (main2Initialized) {
 		console.log("main2 got called twice again.  check the preloader.");
 		return;
@@ -232,12 +311,12 @@ function main2() {
 	glutil.view.zNear = .1;
 	glutil.view.zFar = 100;
 	glutil.view.fovY = 90;
-	quat.mul(glutil.view.angle, /*90' x*/[SQRT_1_2,0,0,SQRT_1_2], /*90' -y*/[0,-SQRT_1_2,0,SQRT_1_2]);
+	quat.mul(glutil.view.angle, /*90' y*/[0,SQRT_1_2,0,SQRT_1_2], /*90' -x*/[-SQRT_1_2,0,0,SQRT_1_2]);
 	quat.copy(initAngle, glutil.view.angle);
 	quat.conjugate(initAngleInv, initAngle);
 
-	console.log('creating skyTex');
-	var skyTex = new glutil.TextureCube({
+	console.log('creating skyTex', skyTexFilenames);
+	const skyTex = new glutil.TextureCube({
 		flipY : true,
 		generateMipmap : true,
 		magFilter : gl.LINEAR,
@@ -248,145 +327,66 @@ function main2() {
 		},
 		urls : skyTexFilenames,
 		onload : function(side,url,image) {
+console.log('onload');			
 			if (image.width > glMaxCubeMapTextureSize || image.height > glMaxCubeMapTextureSize) {
 				throw "cube map size "+image.width+"x"+image.height+" cannot exceed "+glMaxCubeMapTextureSize;
 			}
 		},
-		done : function() {
-			main3(this);
-		}
+		done : () => {
+console.log('done');			
+			skyboxRenderer.initScene(skyTex);
+console.log('2');
+			document.querySelectorAll('input[name="mouseMethod"]').forEach(o => {
+				o.addEventListener('click', e => {
+					_G[o.name] = o.value;
+				});
+			});
+			document.querySelectorAll('input[name="drawMethod"]').forEach(o => {
+				o.addEventListener('click', e => {
+					_G[o.name] = o.value;
+				});
+			});
+
+console.log('3');
+			const tmpQ = quat.create();	
+			mouse = new Mouse3D({
+				pressObj : canvas,
+				move : function(dx,dy) {
+					let rotAngle = Math.PI / 180 * .01 * Math.sqrt(dx*dx + dy*dy);
+					quat.setAxisAngle(tmpQ, [dy, dx, 0], rotAngle);
+
+					if (_G.mouseMethod == 'rotateCamera') {
+						quat.conjugate(tmpQ, tmpQ);
+						quat.mul(glutil.view.angle, tmpQ, glutil.view.angle);
+						quat.normalize(glutil.view.angle, glutil.view.angle);
+					} else if (_G.mouseMethod == 'rotateObject') {
+						//rotate into view space
+						quat.conjugate(tmpQ, tmpQ);
+						quat.mul(tmpQ, tmpQ, initAngle);
+						quat.mul(tmpQ, initAngleInv, tmpQ);
+
+						quat.mul(_G.objectAngle, _G.objectAngle, tmpQ);
+						quat.normalize(_G.objectAngle, _G.objectAngle);
+						skyboxRenderer.resetField();
+					}
+				},
+				zoom : function(dz) {
+					glutil.view.fovY *= Math.exp(-.0003 * dz);
+					glutil.view.fovY = Math.clamp(glutil.view.fovY, 1, 179);
+					glutil.updateProjection();
+				}
+			});
+			
+console.log('4');
+			const setRunning = e => { skyboxRenderer.runSimulation = ids.runSimulation.checked; };
+			ids.runSimulation.addEventListener('click', setRunning);
+			setRunning();
+
+			skyboxRenderer.resetField();
+
+			window.addEventListener('resize', resize);
+			resize();
+			update();
+		},
 	});
-}
-
-
-var skyTexFilenames = [
-	'skytex/sky-visible-cube-xp.png',
-	'skytex/sky-visible-cube-xn.png',
-	'skytex/sky-visible-cube-yp.png',
-	'skytex/sky-visible-cube-yn.png',
-	'skytex/sky-visible-cube-zp.png',
-	'skytex/sky-visible-cube-zn.png'
-];
-
-function main1() {
-	$('#panelButton').click(function() {
-		var panel = $('#panel');	
-		if (panel.css('display') == 'none') {
-			panel.show();
-			$('#info').hide();
-		} else {
-			panel.hide();
-		}
-	});
-	$('#infoButton').click(function() {
-		var info = $('#info');
-		if (info.css('display') == 'none') {
-			info.show();
-			$('#panel').hide();
-		} else {
-			info.hide();
-		}
-	});
-	
-	canvas = $('<canvas>', {
-		css : {
-			left : 0,
-			top : 0,
-			position : 'absolute'
-		}
-	}).prependTo(document.body).get(0);
-	$(canvas).disableSelection()
-
-	var objectTypeParamDivs = {};
-	var refreshObjectTypeParamDivs = function() {
-		$.each(objectTypeParamDivs, function(divObjectType,objectTypeParamDiv) {
-			if (divObjectType == objectType) {
-				objectTypeParamDiv.show();
-			} else {
-				objectTypeParamDiv.hide();
-			}
-		});
-	};
-	$.each(objectTypes, function(k,v) {
-		objectTypeParamDivs[v] = $('#'+v.replace(new RegExp(' ', 'g'), '_')+'_params');
-		var option = $('<option>', {text:v});
-		option.appendTo($('#objectTypes'));
-		if (v == objectType) {
-			option.attr('selected', 'true');
-		}
-	});
-	$('#objectTypes').change(function() {
-		objectType = $('#objectTypes').val();
-		refreshObjectTypeParamDivs();
-		skyboxRenderer.resetField();
-	});
-	refreshObjectTypeParamDivs();
-
-	$.each([
-		'deltaLambda',
-		'objectDist',
-		'blackHoleMass',
-		'blackHoleCharge',
-		'blackHoleAngularVelocity',
-		'warpBubbleThickness',
-		'warpBubbleVelocity',
-		'warpBubbleRadius'
-	], function(k,v) {
-		var id = '#' + v;
-		$(id).val(window[v]);
-		$(id).change(function() {
-			window[v] = $(id).val()*1;
-			$(id).blur();
-		});
-	});
-
-	skyboxRendererClassName = 'GeodesicFBORenderer';
-	var classname = $.url().param('renderer');
-	if (classname) {
-		skyboxRendererClassName = classname;
-	}
-	if (skyboxRendererClassNames.indexOf(skyboxRendererClassName) == -1) throw "unable to find skybox renderer named "+skyboxRendererClassName;
-
-	$.each(skyboxRendererClassNames, function(i,name) {
-		var radio = $('#' + name);
-		radio.click(function() {
-			location.href = 'index.html?renderer=' + name;
-		});
-		if (name == skyboxRendererClassName) radio.attr('checked', 'checked');
-	});
-
-	try {
-		glutil = new GLUtil({canvas:canvas});
-		gl = glutil.context;
-	} catch (e) {
-		$(canvas).remove();
-		$('#webglfail').show();
-		throw e;
-	}
-	$('#menu').show();
-	
-	glMaxCubeMapTextureSize = gl.getParameter(gl.MAX_CUBE_MAP_TEXTURE_SIZE);
-	
-	hsvTex = new glutil.HSVTexture(256);
-	hsvTex.bind();
-	gl.texParameteri(hsvTex.target, gl.TEXTURE_WRAP_S, gl.REPEAT);
-	hsvTex.unbind();
-
-	$('#reset').click(function() {
-		skyboxRenderer.resetField();
-	});
-
-	$('#reset_view').click(function() {
-		quat.copy(objectAngle, quat.create());
-		quat.copy(glutil.view.angle, initAngle);
-		skyboxRenderer.resetField();
-	});
-
-	skyboxRenderer = new (window[skyboxRendererClassName])(glutil);
-
-	gl.disable(gl.DITHER);
-
-	$(skyTexFilenames).preload(main2);
-}
-
-$(document).ready(main1);
+});
