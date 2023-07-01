@@ -231,7 +231,7 @@ refreshObjectTypeParamDivs();
 	o.value = _G[v];
 	o.addEventListener('change', e => {
 		_G[v] = o.value*1;
-		o.dispatchEvent(new Event('blur'));
+		o.blur();
 	});
 });
 
