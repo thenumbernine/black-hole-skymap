@@ -25,11 +25,11 @@ conn^phi_theta_theta = -sin(phi) cos(phi)
 local openglapp = require 'openglapp'
 local bit = require 'bit'
 local ffi = require 'ffi'
-local gl = require 'ffi.gl'
-local glu = require 'ffi.glu'
-local sdl = require 'ffi.sdl'
+local gl = require 'gl'
+local glu = require 'ffi.req' 'glu'
+local sdl = require 'ffi.req' 'sdl'
 
---local tw = require 'ffi.anttweakbar'
+--local tw = require 'ffi.req' 'anttweakbar'
 
 local Quat = require 'vec.quat'
 require 'glutil.tex'
