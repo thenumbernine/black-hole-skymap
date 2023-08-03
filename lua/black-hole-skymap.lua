@@ -259,7 +259,7 @@ void main() {
 		end
 	end
 
-	fbo = FBO{width=lightRes, height=lightRes}
+	fbo = FBO{width=lightRes, height=lightRes}:unbind()
 
 	local iterateLightShaderVertexCode = [[
 varying vec2 tc;
