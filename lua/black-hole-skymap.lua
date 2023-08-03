@@ -237,12 +237,12 @@ void main() {
 	initLightPosShader = GLProgram{
 		vertexCode = initLightShaderVertexCode,
 		fragmentCode = initLightShaderFragmentCode:gsub('$assign', 'gl_FragColor = rel;'),
-	}
+	}:useNone()
 	
 	initLightVelShader = GLProgram{
 		vertexCode = initLightShaderVertexCode,
 		fragmentCode = initLightShaderFragmentCode:gsub('$assign', 'gl_FragColor = relDiff;'),
-	}
+	}:useNone()
 	
 	local lightRes = 1024
 	for _,texs in ipairs{lightPosTexs, lightVelTexs} do
@@ -369,13 +369,13 @@ void main() {
 		vertexCode = iterateLightShaderVertexCode,
 		fragmentCode = iterateLightShaderFragmentCode:gsub('$assign', 'gl_FragColor = rel;'),
 		uniforms = iterateLightShaderUniforms,
-	}
+	}:useNone()
 	
 	iterateLightVelShader = GLProgram{
 		vertexCode = iterateLightShaderVertexCode,
 		fragmentCode = iterateLightShaderFragmentCode:gsub('$assign', 'gl_FragColor = relDiff;'),
 		uniforms = iterateLightShaderUniforms,
-	}
+	}:useNone()
 	
 		
 --[[
@@ -436,7 +436,7 @@ void main() {
 			posTex = 0,
 			cubeTex = 1,
 		},
-	}
+	}:useNone()
 	
 	gl.glClearColor(.3, .3, .3, 1)		
 end
