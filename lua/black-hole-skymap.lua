@@ -86,7 +86,7 @@ App.viewDist = 20
 function App:initGL()
 	App.super.initGL(self)
 
-	self.view.angle = 
+	self.view.angle =
 		quatd(-math.sqrt(.5), 0, 0, -math.sqrt(.5))
 		* quatd(0, -math.sqrt(.5), 0, math.sqrt(.5))
 
@@ -107,7 +107,7 @@ function App:initGL()
 		magFilter = gl.GL_LINEAR,
 		minFilter = gl.GL_LINEAR,
 	}
-		
+
 	local shaderDefs = [[
 #version 120
 
@@ -149,7 +149,7 @@ x = r
 y = polar angle
 z = inclination angle
 */
-		
+
 vec4 euclidianToSpheric(vec4 xyzt) {
 	vec4 rhpt;
 	float r2 = length(xyzt.xy);	//length in xy
@@ -215,18 +215,18 @@ varying vec3 eyePos;
 varying vec3 vtxPos;
 
 void main() {
-	vec4 rel = vec4(eyePos, 1.); 
+	vec4 rel = vec4(eyePos, 1.);
 	vec4 relDirEnd = vec4(vtxPos - eyePos, 1.);
 
 	//convert to spherical coordinates for iteration
 	rel = TO_COORDINATES(rel);
-	
+
 	//find the difference of a vector pointing in the initial direction, in the black hole's spherical coordinates
 	relDirEnd = TO_COORDINATES(relDirEnd);
 
 	//get the direction difference in spheric coordinates
 	vec4 relDiff = relDirEnd - rel;
-	
+
 	//...and start us off in the view plane
 	rel = relDirEnd;
 
@@ -238,12 +238,12 @@ void main() {
 		vertexCode = initLightShaderVertexCode,
 		fragmentCode = initLightShaderFragmentCode:gsub('$assign', 'gl_FragColor = rel;'),
 	}:useNone()
-	
+
 	initLightVelShader = GLProgram{
 		vertexCode = initLightShaderVertexCode,
 		fragmentCode = initLightShaderFragmentCode:gsub('$assign', 'gl_FragColor = relDiff;'),
 	}:useNone()
-	
+
 	local lightRes = 1024
 	for _,texs in ipairs{lightPosTexs, lightVelTexs} do
 		for i=1,2 do
@@ -278,12 +278,12 @@ void main() {
 
 	vec4 rel = texture2D(posTex, tc);
 	vec4 relDiff = texture2D(velTex, tc);
-	
+
 	//integrate along geodesic
 	for (int i = 0; i < ITERATIONS; i++) {
 		//-x''^a = conn^a_bc x'^b x'^c
 		vec4 negRelDiff2;
-	
+
 #ifdef SCHWARZSCHILD_CARTESIAN
 		float r = length(rel.xyz);
 		float posDotVel = dot(rel.xyz, relDiff.xyz);
@@ -364,20 +364,20 @@ void main() {
 		posTex = 0,
 		velTex = 1,
 	}
-	
+
 	iterateLightPosShader = GLProgram{
 		vertexCode = iterateLightShaderVertexCode,
 		fragmentCode = iterateLightShaderFragmentCode:gsub('$assign', 'gl_FragColor = rel;'),
 		uniforms = iterateLightShaderUniforms,
 	}:useNone()
-	
+
 	iterateLightVelShader = GLProgram{
 		vertexCode = iterateLightShaderVertexCode,
 		fragmentCode = iterateLightShaderFragmentCode:gsub('$assign', 'gl_FragColor = relDiff;'),
 		uniforms = iterateLightShaderUniforms,
 	}:useNone()
-	
-		
+
+
 --[[
 how it'll work ...
 1) start with the normalized world vector
@@ -401,28 +401,28 @@ varying vec2 tc;
 
 void main() {
 	vec4 rel = texture2D(posTex, tc);
-	
+
 #if 0
 	//warn if the light ended up in the event horizon
 	if (rel.x <= EVENT_HORIZON_RADIUS) {
 		gl_FragColor = vec4(tc.x, tc.y, 0., 1.);
-	} else 
+	} else
 #endif
 	{
 		//convert back to euclidian space
 		vec3 result = FROM_COORDINATES(rel).xyz;
-		
+
 		//convert from black-hole-centered to view-centered
 		//result += gl_ModelViewMatrix[3].xyz;
-		result += COORDINATE_CENTER; 
+		result += COORDINATE_CENTER;
 		//result += vec3(
 		//	dot(gl_ModelViewMatrix[0].xyz, gl_ModelViewMatrix[3].xyz),
 		//	dot(gl_ModelViewMatrix[1].xyz, gl_ModelViewMatrix[3].xyz),
 		//	dot(gl_ModelViewMatrix[2].xyz, gl_ModelViewMatrix[3].xyz));
-		
+
 		//with distortion
 		gl_FragColor = textureCube(cubeTex, result);
-		
+
 		//no distortion
 	//	gl_FragColor = textureCube(cubeTex, pos);
 
@@ -437,52 +437,52 @@ void main() {
 			cubeTex = 1,
 		},
 	}:useNone()
-	
-	gl.glClearColor(.3, .3, .3, 1)		
+
+	gl.glClearColor(.3, .3, .3, 1)
 end
 
-function App:event(event, eventPtr)
-	App.super.event(self, event, eventPtr)
-	if event.type == sdl.SDL_MOUSEMOTION then
+function App:event(e)
+	App.super.event(self, e)
+	if e[0].type == sdl.SDL_MOUSEMOTION then
 		if leftButtonDown then
 			lightInitialized = false
 		end
-	elseif event.type == sdl.SDL_MOUSEBUTTONDOWN then
-		if event.button.button == sdl.SDL_BUTTON_LEFT then
+	elseif e[0].type == sdl.SDL_MOUSEBUTTONDOWN then
+		if e[0].button.button == sdl.SDL_BUTTON_LEFT then
 			leftButtonDown = true
-		elseif event.button.button == sdl.SDL_BUTTON_WHEELUP then
+		elseif e[0].button.button == sdl.SDL_BUTTON_WHEELUP then
 			lightInitialized = false
-		elseif event.button.button == sdl.SDL_BUTTON_WHEELDOWN then
+		elseif e[0].button.button == sdl.SDL_BUTTON_WHEELDOWN then
 			lightInitialized = false
 		end
-	elseif event.type == sdl.SDL_MOUSEBUTTONUP then
-		if event.button.button == sdl.SDL_BUTTON_LEFT then
+	elseif e[0].type == sdl.SDL_MOUSEBUTTONUP then
+		if e[0].button.button == sdl.SDL_BUTTON_LEFT then
 			leftButtonDown = false
 		end
-	elseif event.type == sdl.SDL_KEYDOWN then
-		if event.key.keysym.sym == sdl.SDLK_i then
+	elseif e[0].type == sdl.SDL_KEYDOWN then
+		if e[0].key.keysym.sym == sdl.SDLK_i then
 			doIteration = 2
-		elseif event.key.keysym.sym == sdl.SDLK_j then
+		elseif e[0].key.keysym.sym == sdl.SDLK_j then
 			doIteration = 1
 		end
 	end
 end
-	
+
 function App:updateGUI()
 	ig.igText'testing testing'
 	ig.luatableInputFloat('delta lambda', _G, 'deltaLambdaPtr')
 	ig.luatableInputInt('iterations', _G, 'iterationsPtr')
 end
-	
+
 function App:update()
 	local view = self.view
 	local viewWidth, viewHeight = self.width, self.height
 	local aspectRatio = viewWidth / viewHeight
-	
+
 	-- init light if necessary
 	if not lightInitialized then
 		lightInitialized = true
-		
+
 		gl.glViewport(0, 0, fbo.width, fbo.height)
 
 		local tanFovY = math.tan(view.fovY / 2)
@@ -502,7 +502,7 @@ view.pos = oldpos
 				callback = function()
 					gl.glBegin(gl.GL_QUADS)
 					for _,uv in ipairs(uvs) do
-						gl.glVertex3f((uv.x - .5) * 2 * tanFovX, 
+						gl.glVertex3f((uv.x - .5) * 2 * tanFovX,
 							(uv.y - .5) * 2 * tanFovY,
 							-1)
 					end
@@ -523,7 +523,7 @@ view.pos = oldpos
 		gl.glOrtho(0,1,0,1,-1,1)
 		gl.glMatrixMode(gl.GL_MODELVIEW)
 		gl.glLoadIdentity()
-		
+
 		for _,args in ipairs{
 			{tex=lightPosTexs[2].id, shader=iterateLightPosShader},
 			{tex=lightVelTexs[2].id, shader=iterateLightVelShader},
@@ -541,7 +541,7 @@ view.pos = oldpos
 				end,
 			}
 		end
-		
+
 		-- swap
 		lightPosTexs[1], lightPosTexs[2] = lightPosTexs[2], lightPosTexs[1]
 		lightVelTexs[1], lightVelTexs[2] = lightVelTexs[2], lightVelTexs[1]
@@ -574,7 +574,7 @@ view.pos = oldpos
 	-- [[
 	local oldpos = view.pos
 	view:setup(aspectRatio)
-	
+
 	gl.glPolygonMode(gl.GL_FRONT_AND_BACK, gl.GL_LINE)
 	gl.glBegin(gl.GL_QUADS)
 	local s = 1
@@ -594,4 +594,4 @@ view.pos = oldpos
 	App.super.update(self)
 end
 
-App():run()
+return App():run()
