@@ -33,6 +33,7 @@ local ig = require 'imgui'
 local vec2d = require 'vec-ffi.vec2d'
 local vec3d = require 'vec-ffi.vec3d'
 local quatd = require 'vec-ffi.quatd'
+local matrix_ffi = require 'matrix.ffi'
 local GLTex2D = require 'gl.tex2d'
 local GLTexCube = require 'gl.texcube'
 local GLProgram = require 'gl.program'
@@ -79,12 +80,15 @@ deltaLambdaPtr = 1
 iterationsPtr = 1
 
 local App = require 'imguiapp.withorbit'()
-
+App.viewUseBuiltinMatrixMath = true
 App.title = 'black hole raytracer'
 App.viewDist = 20
 
 function App:initGL()
 	App.super.initGL(self)
+
+	self.fboProjMat = matrix_ffi({4,4}, 'float'):zeros():setOrtho(0, 1, 0, 1, -1, 1)
+	self.identMat = matrix_ffi({4,4}, 'float'):zeros():setIdent()
 
 	self.view.angle =
 		quatd(-math.sqrt(.5), 0, 0, -math.sqrt(.5))
@@ -109,8 +113,6 @@ function App:initGL()
 	}
 
 	local shaderDefs = [[
-#version 120
-
 #define DLAMBDA .1
 #define M_PI 3.14159265358979311599796346854418516159057617187500
 #define ITERATIONS 1
@@ -195,24 +197,27 @@ inverse camera parameters:
 [R^-1 0] [1 -T]   [R^-1, -R^-1 T]
 [0    1] [0  1] = [   0,    1   ]
 --]]
-	local initLightShaderVertexCode = shaderDefs .. [[
-varying vec3 eyePos;
-varying vec3 vtxPos;
+	local initLightShaderVertexCode = [[
+in vec4 vertex;
+out vec3 eyePos;
+out vec3 vtxPos;
+uniform mat4 projMat, mvMat;
 void main() {
 	mat3 rot = transpose(mat3(
-		gl_ModelViewMatrix[0].xyz,
-		gl_ModelViewMatrix[1].xyz,
-		gl_ModelViewMatrix[2].xyz));
-	eyePos = -rot * gl_ModelViewMatrix[3].xyz;
-	vtxPos = rot * gl_Vertex.xyz + eyePos;
+		mvMat[0].xyz,
+		mvMat[1].xyz,
+		mvMat[2].xyz));
+	eyePos = -rot * mvMat[3].xyz;
+	vtxPos = rot * vertex.xyz + eyePos;
 
-	gl_Position = gl_ProjectionMatrix * gl_Vertex;
+	gl_Position = projMat * vertex;
 }
 ]]
 
 	local initLightShaderFragmentCode = shaderDefs .. [[
-varying vec3 eyePos;
-varying vec3 vtxPos;
+in vec3 eyePos;
+in vec3 vtxPos;
+out vec4 fragColor;
 
 void main() {
 	vec4 rel = vec4(eyePos, 1.);
@@ -235,13 +240,17 @@ void main() {
 ]]
 
 	initLightPosShader = GLProgram{
-		vertexCode = initLightShaderVertexCode,
-		fragmentCode = initLightShaderFragmentCode:gsub('$assign', 'gl_FragColor = rel;'),
+		version = 'latest',
+		precision = 'best',
+		vertexCode = shaderDefs .. initLightShaderVertexCode,
+		fragmentCode = initLightShaderFragmentCode:gsub('$assign', 'fragColor = rel;'),
 	}:useNone()
 
 	initLightVelShader = GLProgram{
-		vertexCode = initLightShaderVertexCode,
-		fragmentCode = initLightShaderFragmentCode:gsub('$assign', 'gl_FragColor = relDiff;'),
+		version = 'latest',
+		precision = 'best',
+		vertexCode = shaderDefs .. initLightShaderVertexCode,
+		fragmentCode = initLightShaderFragmentCode:gsub('$assign', 'fragColor = relDiff;'),
 	}:useNone()
 
 	local lightRes = 1024
@@ -262,22 +271,25 @@ void main() {
 	fbo = FBO{width=lightRes, height=lightRes}:unbind()
 
 	local iterateLightShaderVertexCode = [[
-varying vec2 tc;
+in vec4 vertex;
+out vec2 tc;
+uniform mat4 projMat, mvMat;
 void main() {
-	tc = gl_Vertex.xy;
-	gl_Position = ftransform();
+	tc = vertex.xy;
+	gl_Position = projMat * mvMat * vertex;
 }
 ]]
 
-	local iterateLightShaderFragmentCode = shaderDefs .. [[
+	local iterateLightShaderFragmentCode = [[
+in vec2 tc;
+out vec4 fragColor;
 
 uniform sampler2D posTex;
 uniform sampler2D velTex;
-varying vec2 tc;
 void main() {
 
-	vec4 rel = texture2D(posTex, tc);
-	vec4 relDiff = texture2D(velTex, tc);
+	vec4 rel = texture(posTex, tc);
+	vec4 relDiff = texture(velTex, tc);
 
 	//integrate along geodesic
 	for (int i = 0; i < ITERATIONS; i++) {
@@ -366,14 +378,18 @@ void main() {
 	}
 
 	iterateLightPosShader = GLProgram{
+		version = 'latest',
+		precision = 'best',
 		vertexCode = iterateLightShaderVertexCode,
-		fragmentCode = iterateLightShaderFragmentCode:gsub('$assign', 'gl_FragColor = rel;'),
+		fragmentCode = shaderDefs .. iterateLightShaderFragmentCode:gsub('$assign', 'fragColor = rel;'),
 		uniforms = iterateLightShaderUniforms,
 	}:useNone()
 
 	iterateLightVelShader = GLProgram{
+		version = 'latest',
+		precision = 'best',
 		vertexCode = iterateLightShaderVertexCode,
-		fragmentCode = iterateLightShaderFragmentCode:gsub('$assign', 'gl_FragColor = relDiff;'),
+		fragmentCode = shaderDefs .. iterateLightShaderFragmentCode:gsub('$assign', 'fragColor = relDiff;'),
 		uniforms = iterateLightShaderUniforms,
 	}:useNone()
 
@@ -387,25 +403,30 @@ how it'll work ...
 you could do the iteration in the shader loop, or you could use a fbo to store state information ...
 --]]
 	drawLightShader = GLProgram{
-		vertexCode=[[
-varying vec2 tc;
+		version = 'latest',
+		precision = 'best',
+		vertexCode = [[
+in vec4 vertex;
+out vec2 tc;
+uniform mat4 projMat;
 void main() {
-	tc = gl_Vertex.xy;
-	gl_Position = gl_ProjectionMatrix * gl_Vertex;
+	tc = vertex.xy;
+	gl_Position = projMat * vertex;
 }
 ]],
 		fragmentCode = shaderDefs .. [[
+in vec2 tc;
+out vec4 fragColor;
 uniform sampler2D posTex;
 uniform samplerCube cubeTex;
-varying vec2 tc;
 
 void main() {
-	vec4 rel = texture2D(posTex, tc);
+	vec4 rel = texture(posTex, tc);
 
 #if 0
 	//warn if the light ended up in the event horizon
 	if (rel.x <= EVENT_HORIZON_RADIUS) {
-		gl_FragColor = vec4(tc.x, tc.y, 0., 1.);
+		fragColor = vec4(tc.x, tc.y, 0., 1.);
 	} else
 #endif
 	{
@@ -413,22 +434,22 @@ void main() {
 		vec3 result = FROM_COORDINATES(rel).xyz;
 
 		//convert from black-hole-centered to view-centered
-		//result += gl_ModelViewMatrix[3].xyz;
+		//result += mvMat[3].xyz;
 		result += COORDINATE_CENTER;
 		//result += vec3(
-		//	dot(gl_ModelViewMatrix[0].xyz, gl_ModelViewMatrix[3].xyz),
-		//	dot(gl_ModelViewMatrix[1].xyz, gl_ModelViewMatrix[3].xyz),
-		//	dot(gl_ModelViewMatrix[2].xyz, gl_ModelViewMatrix[3].xyz));
+		//	dot(mvMat[0].xyz, mvMat[3].xyz),
+		//	dot(mvMat[1].xyz, mvMat[3].xyz),
+		//	dot(mvMat[2].xyz, mvMat[3].xyz));
 
 		//with distortion
-		gl_FragColor = textureCube(cubeTex, result);
+		fragColor = texture(cubeTex, result);
 
 		//no distortion
-	//	gl_FragColor = textureCube(cubeTex, pos);
+	//	fragColor = texture(cubeTex, pos);
 
 		//difference
-	//	vec4 color = textureCube(cubeTex, result) - textureCube(cubeTex, pos);
-	//	gl_FragColor = vec4(abs(color.x), abs(color.y), abs(color.z), abs(color.w));
+	//	vec4 color = texture(cubeTex, result) - texture(cubeTex, pos);
+	//	fragColor = vec4(abs(color.x), abs(color.y), abs(color.z), abs(color.w));
 	}
 }
 ]],
@@ -436,6 +457,24 @@ void main() {
 			posTex = 0,
 			cubeTex = 1,
 		},
+	}:useNone()
+
+	self.wireframeShader = GLProgram{
+		version = 'latest',
+		precision = 'best',
+		vertexCode = [[
+in vec4 vertex;
+uniform mat4 projMat, mvMat;
+void main() {
+	gl_Position = projMat * mvMat * vertex;
+}
+]],
+		fragmentCode = [[
+out vec4 fragColor;
+void main() {
+	fragColor = vec4(1., 1., 1., 1.);
+}
+]],
 	}:useNone()
 
 	gl.glClearColor(.3, .3, .3, 1)
@@ -499,6 +538,10 @@ view.pos = oldpos
 			fbo:draw{
 				dest = args.tex,
 				shader = args.shader,
+				uniforms = {
+					mvMat = view.mvMat.ptr,
+					projMat = view.projMat.ptr,
+				},
 				callback = function()
 					gl.glBegin(gl.GL_QUADS)
 					for _,uv in ipairs(uvs) do
@@ -518,12 +561,6 @@ view.pos = oldpos
 		gl.glViewport(0, 0, fbo.width, fbo.height)
 		gl.glClear(gl.GL_COLOR_BUFFER_BIT)
 
-		gl.glMatrixMode(gl.GL_PROJECTION)
-		gl.glLoadIdentity()
-		gl.glOrtho(0,1,0,1,-1,1)
-		gl.glMatrixMode(gl.GL_MODELVIEW)
-		gl.glLoadIdentity()
-
 		for _,args in ipairs{
 			{tex=lightPosTexs[2].id, shader=iterateLightPosShader},
 			{tex=lightVelTexs[2].id, shader=iterateLightVelShader},
@@ -531,6 +568,10 @@ view.pos = oldpos
 			fbo:draw{
 				dest = args.tex,
 				shader = args.shader,
+				uniforms = {
+					projMat = self.fboProjMat.ptr,
+					mvMat = self.identMat.ptr,
+				},
 				texs = {lightPosTexs[1], lightVelTexs[1]},
 				callback = function()
 					gl.glBegin(gl.GL_QUADS)
@@ -550,15 +591,15 @@ view.pos = oldpos
 	gl.glViewport(0,0,viewWidth, viewHeight)
 	gl.glClear(gl.GL_COLOR_BUFFER_BIT)
 
-	gl.glMatrixMode(gl.GL_PROJECTION)
-	gl.glLoadIdentity()
-	gl.glOrtho(0,1,0,1,-1,1)
-	gl.glMatrixMode(gl.GL_MODELVIEW)
 	view:setupModelView()
 	--gl.glLoadIdentity()
 	--gl.glTranslatef(20, 0, 0)
 
 	drawLightShader:use()
+	drawLightShader:setUniforms{
+		projMat = self.fboProjMat.ptr,
+		mvMat = view.mvMat.ptr,
+	}
 	lightPosTexs[1]:bind(0)
 	skyTex:bind(1)
 	gl.glBegin(gl.GL_QUADS)
@@ -575,6 +616,12 @@ view.pos = oldpos
 	local oldpos = view.pos
 	view:setup(aspectRatio)
 
+	self.wireframeShader:use()
+	self.wireframeShader:setUniforms{
+		projMat = view.projMat.ptr,
+		mvMat = view.mvMat.ptr,
+	}
+
 	gl.glPolygonMode(gl.GL_FRONT_AND_BACK, gl.GL_LINE)
 	gl.glBegin(gl.GL_QUADS)
 	local s = 1
@@ -588,6 +635,7 @@ view.pos = oldpos
 	end
 	gl.glEnd()
 	gl.glPolygonMode(gl.GL_FRONT_AND_BACK, gl.GL_FILL)
+	self.wireframeShader:useNone()
 	--]]
 
 	glreport('update done')
