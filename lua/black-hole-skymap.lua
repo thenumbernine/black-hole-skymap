@@ -80,7 +80,6 @@ deltaLambdaPtr = 1
 iterationsPtr = 1
 
 local App = require 'imguiapp.withorbit'()
-App.viewUseBuiltinMatrixMath = true
 App.title = 'black hole raytracer'
 App.viewDist = 20
 
