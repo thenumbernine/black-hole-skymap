@@ -28,7 +28,7 @@ local bit = require 'bit'
 local ffi = require 'ffi'
 local gl = require 'gl'
 local glu = require 'ffi.req' 'glu'
-local sdl = require 'ffi.req' 'sdl'
+local sdl = require 'sdl'
 local ig = require 'imgui'
 local vec2d = require 'vec-ffi.vec2d'
 local vec3d = require 'vec-ffi.vec3d'
@@ -79,7 +79,7 @@ local uvs = {
 deltaLambdaPtr = 1
 iterationsPtr = 1
 
-local App = require 'imguiapp.withorbit'()
+local App = require 'imgui.appwithorbit'()
 App.title = 'black hole raytracer'
 App.viewDist = 20
 

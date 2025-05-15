@@ -27,7 +27,7 @@ local bit = require 'bit'
 local ffi = require 'ffi'
 local gl = require 'gl'
 local glu = require 'ffi.req' 'glu'
-local sdl = require 'ffi.req' 'sdl'
+local sdl = require 'sdl'
 
 --local tw = require 'ffi.req' 'anttweakbar'
 
