@@ -5,27 +5,27 @@ cube map render
 shader that iterates along geodesic from the view plane backwards through time to infinity
 then reprojects onto the cubemap
 
-schwarzschild metric: ds^2 = -(1-R/r)dt^2 + 1/(1-R/r)dr^2 + r^2 (dθ^2 + sin(θ)^2 dφ^2)
+schwarzschild metric: ds² = -(1-R/r)dt² + 1/(1-R/r)dr² + r² (dθ² + sin(θ)² dφ²)
 where R = 2M is the schwarzschild radius
 
 christoffel symbols:
 
-conn^r_tt = R(r-R)/(2r^3)
-conn^t_tr = -conn^r_rr = R/(2r(r-R))
-conn^φ_rφ = conn^θ_rθ = 1/r
-conn^r_φφ = -(r - R)
-conn^θ_φθ = cos(φ)/sin(φ)
-conn^r_θθ = -(r - R) sin(φ)^2
-conn^φ_θθ = -sin(φ) cos(φ)
+Γ^r_tt = R(r-R)/(2r³)
+Γ^t_tr = -Γ^r_rr = R/(2r(r-R))
+Γ^φ_rφ = Γ^θ_rθ = 1/r
+Γ^r_φφ = -(r - R)
+Γ^θ_φθ = cos(φ)/sin(φ)
+Γ^r_θθ = -(r - R) sin(φ)²
+Γ^φ_θθ = -sin(φ) cos(φ)
 
 -t'' = R/(r(r-R)) t' r'
--r'' = R(r-R)/(2r^3) t'^2 - R/(2r(r-R)) r'^2 - (r - R) φ'^2 - (r - R) sin(φ)^2 θ'^2
+-r'' = R(r-R)/(2r³) t'² - R/(2r(r-R)) r'² - (r - R) φ'² - (r - R) sin(φ)² θ'²
 -θ'' = 2/r r' θ' + 2 cos(φ)/sin(φ) φ' θ'
--φ'' = 2/r r' φ' - sin(φ) cos(φ) θ'^2
+-φ'' = 2/r r' φ' - sin(φ) cos(φ) θ'²
 --]]
 
-local bit = require 'bit'
 local ffi = require 'ffi'
+local table = require 'ext.table'
 local gl = require 'gl'
 local glu = require 'ffi.req' 'glu'
 local sdl = require 'sdl'
@@ -36,11 +36,11 @@ local quatd = require 'vec-ffi.quatd'
 local matrix_ffi = require 'matrix.ffi'
 local GLTex2D = require 'gl.tex2d'
 local GLTexCube = require 'gl.texcube'
-local GLProgram = require 'gl.program'
+local GLGeometry = require 'gl.geometry'
+local GLSceneObject = require 'gl.sceneobject'
 local FBO = require 'gl.fbo'
 local glreport = require 'gl.report'
 
-local skyTex
 --local viewRot = quatd(0,math.sqrt(.5),0,math.sqrt(.5))*quatd(math.sqrt(.5),0,0,-math.sqrt(.5))
 --local viewAngleAxis = quatd(0,0,0,1)
 --local zNear = .1
@@ -51,29 +51,9 @@ local leftButtonDown
 
 local doIteration = 2
 local lightInitialized = false
-local drawLightShader
-local initLightPosShader, initLightVelShader
-local iterateLightPosShader, iterateLightVelShader
 local lightPosTexs = {}
 local lightVelTexs = {}
 local fbo
-
--- notice that the order matches global 'sides'
-cubeFaces = {
-	{5,7,3,1};		-- <- each value has the x,y,z in the 0,1,2 bits (off = 0, on = 1)
-	{6,4,0,2};
-	{2,3,7,6};
-	{4,5,1,0};
-	{6,7,5,4};
-	{0,1,3,2};
-}
-
-local uvs = {
-	vec2d(0,0),
-	vec2d(1,0),
-	vec2d(1,1),
-	vec2d(0,1),
-}
 
 -- _G for input
 deltaLambdaPtr = 1
@@ -93,7 +73,20 @@ function App:initGL()
 		quatd(-math.sqrt(.5), 0, 0, -math.sqrt(.5))
 		* quatd(0, -math.sqrt(.5), 0, math.sqrt(.5))
 
-	skyTex = GLTexCube{
+	local quadGeom = GLGeometry{
+		mode = gl.GL_TRIANGLE_STRIP,
+		vertexes = {
+			dim = 2,
+			data = 	{
+				0, 0,
+				1, 0,
+				0, 1,
+				1, 1,
+			},
+		},
+	}
+
+	local skyTex = GLTexCube{
 		filenames = {
 			'../skytex/sky-infrared-cube-xp.png',
 			'../skytex/sky-infrared-cube-xn.png',
@@ -113,7 +106,7 @@ function App:initGL()
 
 	local shaderDefs = [[
 #define DLAMBDA .1
-#define M_PI 3.14159265358979311599796346854418516159057617187500
+#define M_PI ]]..('%.49f'):format(math.pi)..'\n'..[[
 #define ITERATIONS 1
 
 #define SCHWARZSCHILD_CARTESIAN
@@ -197,19 +190,21 @@ inverse camera parameters:
 [0    1] [0  1] = [   0,    1   ]
 --]]
 	local initLightShaderVertexCode = [[
-in vec4 vertex;
+in vec2 vertex;
 out vec3 eyePos;
 out vec3 vtxPos;
 uniform mat4 projMat, mvMat;
+uniform vec2 tanFov;
 void main() {
+	vec3 vtx3 = vec3((vertex - .5) * 2. * tanFov, -1.);
+
 	mat3 rot = transpose(mat3(
 		mvMat[0].xyz,
 		mvMat[1].xyz,
 		mvMat[2].xyz));
 	eyePos = -rot * mvMat[3].xyz;
-	vtxPos = rot * vertex.xyz + eyePos;
-
-	gl_Position = projMat * vertex;
+	vtxPos = rot * vtx3 + eyePos;
+	gl_Position = projMat * vec4(vtx3, 1.);
 }
 ]]
 
@@ -238,31 +233,41 @@ void main() {
 }
 ]]
 
-	initLightPosShader = GLProgram{
-		version = 'latest',
-		precision = 'best',
-		vertexCode = shaderDefs .. initLightShaderVertexCode,
-		fragmentCode = initLightShaderFragmentCode:gsub('$assign', 'fragColor = rel;'),
-	}:useNone()
+	initLightPosObj = GLSceneObject{
+		geometry = quadGeom,
+		program = {
+			version = 'latest',
+			precision = 'best',
+			vertexCode = shaderDefs
+				.. initLightShaderVertexCode,
+			fragmentCode = initLightShaderFragmentCode
+				:gsub('$assign', 'fragColor = rel;'),
+		},
+	}
 
-	initLightVelShader = GLProgram{
-		version = 'latest',
-		precision = 'best',
-		vertexCode = shaderDefs .. initLightShaderVertexCode,
-		fragmentCode = initLightShaderFragmentCode:gsub('$assign', 'fragColor = relDiff;'),
-	}:useNone()
+	initLightVelObj = GLSceneObject{
+		geometry = quadGeom,
+		program = {
+			version = 'latest',
+			precision = 'best',
+			vertexCode = shaderDefs
+				.. initLightShaderVertexCode,
+			fragmentCode = initLightShaderFragmentCode
+				:gsub('$assign', 'fragColor = relDiff;'),
+		},
+	}
 
 	local lightRes = 1024
 	for _,texs in ipairs{lightPosTexs, lightVelTexs} do
 		for i=1,2 do
 			texs[i] = GLTex2D{
-				width=lightRes,
-				height=lightRes,
-				format=gl.GL_RGBA,
-				type=gl.GL_FLOAT,
-				internalFormat=gl.GL_RGBA32F,
-				minFilter=gl.GL_NEAREST,
-				magFilter=gl.GL_NEAREST,
+				width = lightRes,
+				height = lightRes,
+				format = gl.GL_RGBA,
+				type = gl.GL_FLOAT,
+				internalFormat = gl.GL_RGBA32F,
+				minFilter = gl.GL_NEAREST,
+				magFilter = gl.GL_NEAREST,
 			}
 		end
 	end
@@ -270,12 +275,12 @@ void main() {
 	fbo = FBO{width=lightRes, height=lightRes}:unbind()
 
 	local iterateLightShaderVertexCode = [[
-in vec4 vertex;
+in vec2 vertex;
 out vec2 tc;
 uniform mat4 projMat, mvMat;
 void main() {
-	tc = vertex.xy;
-	gl_Position = projMat * mvMat * vertex;
+	tc = vertex;
+	gl_Position = projMat * mvMat * vec4(vertex, 0., 1.);
 }
 ]]
 
@@ -292,7 +297,7 @@ void main() {
 
 	//integrate along geodesic
 	for (int i = 0; i < ITERATIONS; i++) {
-		//-x''^a = conn^a_bc x'^b x'^c
+		//-x''^a = Γ^a_bc x'^b x'^c
 		vec4 negRelDiff2;
 
 #ifdef SCHWARZSCHILD_CARTESIAN
@@ -371,27 +376,36 @@ void main() {
 	$assign
 }
 ]]
-	local iterateLightShaderUniforms = {
-		posTex = 0,
-		velTex = 1,
+
+	iterateLightPosObj = GLSceneObject{
+		geometry = quadGeom,
+		program = {
+			version = 'latest',
+			precision = 'best',
+			vertexCode = iterateLightShaderVertexCode,
+			fragmentCode = shaderDefs .. iterateLightShaderFragmentCode
+				:gsub('$assign', 'fragColor = rel;'),
+			uniforms = {
+				posTex = 0,
+				velTex = 1,
+			},
+		},
 	}
 
-	iterateLightPosShader = GLProgram{
-		version = 'latest',
-		precision = 'best',
-		vertexCode = iterateLightShaderVertexCode,
-		fragmentCode = shaderDefs .. iterateLightShaderFragmentCode:gsub('$assign', 'fragColor = rel;'),
-		uniforms = iterateLightShaderUniforms,
-	}:useNone()
-
-	iterateLightVelShader = GLProgram{
-		version = 'latest',
-		precision = 'best',
-		vertexCode = iterateLightShaderVertexCode,
-		fragmentCode = shaderDefs .. iterateLightShaderFragmentCode:gsub('$assign', 'fragColor = relDiff;'),
-		uniforms = iterateLightShaderUniforms,
-	}:useNone()
-
+	iterateLightVelObj = GLSceneObject{
+		geometry = quadGeom,
+		program = {
+			version = 'latest',
+			precision = 'best',
+			vertexCode = iterateLightShaderVertexCode,
+			fragmentCode = shaderDefs .. iterateLightShaderFragmentCode
+				:gsub('$assign', 'fragColor = relDiff;'),
+			uniforms = {
+				posTex = 0,
+				velTex = 1,
+			},
+		},
+	}
 
 --[[
 how it'll work ...
@@ -401,19 +415,21 @@ how it'll work ...
 
 you could do the iteration in the shader loop, or you could use a fbo to store state information ...
 --]]
-	drawLightShader = GLProgram{
-		version = 'latest',
-		precision = 'best',
-		vertexCode = [[
-in vec4 vertex;
+	drawLightSceneObj = GLSceneObject{
+		geometry = quadGeom,
+		program = {
+			version = 'latest',
+			precision = 'best',
+			vertexCode = [[
+in vec2 vertex;
 out vec2 tc;
 uniform mat4 projMat;
 void main() {
-	tc = vertex.xy;
-	gl_Position = projMat * vertex;
+	tc = vertex;
+	gl_Position = projMat * vec4(vertex, 0., 1.);
 }
 ]],
-		fragmentCode = shaderDefs .. [[
+			fragmentCode = shaderDefs .. [[
 in vec2 tc;
 out vec4 fragColor;
 uniform sampler2D posTex;
@@ -452,29 +468,66 @@ void main() {
 	}
 }
 ]],
-		uniforms = {
-			posTex = 0,
-			cubeTex = 1,
+			uniforms = {
+				posTex = 0,
+				cubeTex = 1,
+			},
 		},
-	}:useNone()
+		texs = {
+			[2] = skyTex,
+		},
+	}
 
-	self.wireframeShader = GLProgram{
-		version = 'latest',
-		precision = 'best',
-		vertexCode = [[
-in vec4 vertex;
-uniform mat4 projMat, mvMat;
+	local vtxdata = table()
+	for _,face in ipairs(table{
+		-- <- each value has the x,y,z in the 0,1,2 bits (off = 0, on = 1)
+		{5,7,3,1},
+		{6,4,0,2},
+		{2,3,7,6},
+		{4,5,1,0},
+		{6,7,5,4},
+		{0,1,3,2},
+	}) do
+		for ibase=0,3 do
+			for iofs=0,1 do
+				local i = face[((ibase + iofs)%4)+1]
+				local s = 1
+				local x = bit.band(i, 1)
+				local y = bit.band(bit.rshift(i, 1), 1)
+				local z = bit.band(bit.rshift(i, 2), 1)
+				vtxdata:insert(s*(x*2-1))
+				vtxdata:insert(s*(y*2-1))
+				vtxdata:insert(s*(z*2-1))
+			end
+		end
+	end
+
+	self.wireframeSceneObj = GLSceneObject{
+		vertexes = {
+			dim = 3,
+			data = vtxdata,
+		},
+		geometry = {
+			mode = gl.GL_LINES,
+		},
+		program = {
+			version = 'latest',
+			precision = 'best',
+			vertexCode = [[
+in vec3 vertex;
+uniform mat4 mvProjMat;
 void main() {
-	gl_Position = projMat * mvMat * vertex;
+	gl_Position = mvProjMat * vec4(vertex, 1.);
 }
 ]],
-		fragmentCode = [[
+			fragmentCode = [[
 out vec4 fragColor;
 void main() {
 	fragColor = vec4(1., 1., 1., 1.);
 }
 ]],
-	}:useNone()
+		},
+	}
 
 	gl.glClearColor(.3, .3, .3, 1)
 end
@@ -531,55 +584,48 @@ view:setup(aspectRatio)
 view.pos = oldpos
 
 		for _,args in ipairs{
-			{tex=lightPosTexs[1], shader=initLightPosShader},
-			{tex=lightVelTexs[1], shader=initLightVelShader},
+			{tex=lightPosTexs[1], obj=initLightPosObj},
+			{tex=lightVelTexs[1], obj=initLightVelObj},
 		} do
-			fbo:draw{
-				dest = args.tex,
-				shader = args.shader,
+			fbo:bind()
+			fbo:setColorAttachmentTex2D(args.tex.id)
+			fbo:check()
+			gl.glClear(gl.GL_COLOR_BUFFER_BIT)
+			args.obj:draw{
 				uniforms = {
+					tanFov = {tanFovX, tanFovY},
 					mvMat = view.mvMat.ptr,
 					projMat = view.projMat.ptr,
 				},
-				callback = function()
-					gl.glBegin(gl.GL_QUADS)
-					for _,uv in ipairs(uvs) do
-						gl.glVertex3f((uv.x - .5) * 2 * tanFovX,
-							(uv.y - .5) * 2 * tanFovY,
-							-1)
-					end
-					gl.glEnd()
-				end,
 			}
+			fbo:unbind()
 		end
 	end
 
 	if doIteration ~= 0 then
 		if doIteration == 1 then doIteration = 0 end
-		--print('iterating...')
+--print('iterating...')
 		gl.glViewport(0, 0, fbo.width, fbo.height)
-		gl.glClear(gl.GL_COLOR_BUFFER_BIT)
 
 		for _,args in ipairs{
-			{tex=lightPosTexs[2].id, shader=iterateLightPosShader},
-			{tex=lightVelTexs[2].id, shader=iterateLightVelShader},
+			{tex=lightPosTexs[2], obj=iterateLightPosObj},
+			{tex=lightVelTexs[2], obj=iterateLightVelObj},
 		} do
-			fbo:draw{
-				dest = args.tex,
-				shader = args.shader,
+			fbo:bind()
+			fbo:setColorAttachmentTex2D(args.tex.id)
+			fbo:check()
+			gl.glClear(gl.GL_COLOR_BUFFER_BIT)
+			args.obj:draw{
 				uniforms = {
 					projMat = self.fboProjMat.ptr,
 					mvMat = self.identMat.ptr,
 				},
-				texs = {lightPosTexs[1], lightVelTexs[1]},
-				callback = function()
-					gl.glBegin(gl.GL_QUADS)
-					for _,uv in ipairs(uvs) do
-						gl.glVertex2f(uv:unpack())
-					end
-					gl.glEnd()
-				end,
+				texs = {
+					lightPosTexs[1],
+					lightVelTexs[1],
+				},
 			}
+			fbo:unbind()
 		end
 
 		-- swap
@@ -594,50 +640,26 @@ view.pos = oldpos
 	--gl.glLoadIdentity()
 	--gl.glTranslatef(20, 0, 0)
 
-	drawLightShader:use()
-	drawLightShader:setUniforms{
-		projMat = self.fboProjMat.ptr,
-		mvMat = view.mvMat.ptr,
+	drawLightSceneObj.texs[1] = lightPosTexs[1]
+	drawLightSceneObj:draw{
+		uniforms = {
+			projMat = self.fboProjMat.ptr,
+			mvMat = view.mvMat.ptr,
+		},
 	}
-	lightPosTexs[1]:bind(0)
-	skyTex:bind(1)
-	gl.glBegin(gl.GL_QUADS)
-	for _,uv in ipairs(uvs) do
-		gl.glVertex2f(uv:unpack())
-	end
-	gl.glEnd()
-	drawLightShader:useNone()
-
-	gl.glLoadIdentity()
-	gl.glActiveTexture(gl.GL_TEXTURE0)
 
 	-- [[
 	local oldpos = view.pos
 	view:setup(aspectRatio)
 
-	self.wireframeShader:use()
-	self.wireframeShader:setUniforms{
-		projMat = view.projMat.ptr,
-		mvMat = view.mvMat.ptr,
+	self.wireframeSceneObj:draw{
+		uniforms = {
+			mvProjMat = view.mvProjMat.ptr,
+		},
 	}
-
-	gl.glPolygonMode(gl.GL_FRONT_AND_BACK, gl.GL_LINE)
-	gl.glBegin(gl.GL_QUADS)
-	local s = 1
-	for _,face in ipairs(cubeFaces) do
-		for _,i in ipairs(face) do
-			local x = bit.band(i, 1)
-			local y = bit.band(bit.rshift(i, 1), 1)
-			local z = bit.band(bit.rshift(i, 2), 1)
-			gl.glVertex3d(s*(x*2-1),s*(y*2-1),s*(z*2-1))
-		end
-	end
-	gl.glEnd()
-	gl.glPolygonMode(gl.GL_FRONT_AND_BACK, gl.GL_FILL)
-	self.wireframeShader:useNone()
 	--]]
 
-	glreport('update done')
+glreport'update done'
 	App.super.update(self)
 end
 
