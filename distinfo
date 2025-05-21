@@ -27,7 +27,6 @@ files = {
 	["skytex/test-cube-yp.png"] = "black-hole-skymap/skytex/test-cube-yp.png",
 	["skytex/test-cube-zn.png"] = "black-hole-skymap/skytex/test-cube-zn.png",
 	["skytex/test-cube-zp.png"] = "black-hole-skymap/skytex/test-cube-zp.png",
-	["testcube.html"] = "black-hole-skymap/testcube.html",
 }
 deps = {
 	"bit",
