@@ -1,7 +1,7 @@
 import {Canvas, Option} from '/js/dom.js';
 import {mat4, quat} from '/js/gl-matrix-3.4.1/index.js';
 import {assert, assertExists} from '/js/util.js';
-import {getIDs, removeFromParent, preload, hide, show, hidden} from '/js/util.js';
+import {clamp, getIDs, removeFromParent, preload, hide, show, hidden} from '/js/util.js';
 import {GLUtil} from '/js/gl-util.js';
 import {Mouse3D} from '/js/mouse3d.js';
 import {makeTextureCube} from '/js/gl-util-TextureCube.js';
@@ -373,7 +373,7 @@ console.log('3');
 				},
 				zoom : function(dz) {
 					glutil.view.fovY *= Math.exp(-.0003 * dz);
-					glutil.view.fovY = Math.clamp(glutil.view.fovY, 1, 179);
+					glutil.view.fovY = clamp(glutil.view.fovY, 1, 179);
 					glutil.updateProjection();
 				}
 			});

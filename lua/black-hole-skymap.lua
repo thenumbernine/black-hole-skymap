@@ -27,7 +27,6 @@ christoffel symbols:
 local ffi = require 'ffi'
 local table = require 'ext.table'
 local gl = require 'gl'
-local glu = require 'ffi.req' 'glu'
 local sdl = require 'sdl'
 local ig = require 'imgui'
 local vec2d = require 'vec-ffi.vec2d'
@@ -168,7 +167,7 @@ vec4 sphericToEuclidian(vec4 rhpt) {
 	return xyzt;
 }
 
-#if 0
+#if 0	// when is this defined?
 float tanh(float x) {
 	float exp2x = exp(2. * x);
 	return (exp2x - 1.) / (exp2x + 1.);
