@@ -56,8 +56,8 @@ local lightVelTexs = {}
 local fbo
 
 -- _G for input
-deltaLambdaPtr = 1
-iterationsPtr = 1
+dLambda = 1
+iterationsPerUpdate = 1
 
 local App = require 'imgui.appwithorbit'()
 App.title = 'black hole raytracer'
@@ -88,30 +88,28 @@ function App:initGL()
 
 	local skyTex = GLTexCube{
 		filenames = {
-			'../skytex/sky-infrared-cube-xp.png',
-			'../skytex/sky-infrared-cube-xn.png',
-			'../skytex/sky-infrared-cube-yp.png',
-			'../skytex/sky-infrared-cube-yn.png',
-			'../skytex/sky-infrared-cube-zp.png',
-			'../skytex/sky-infrared-cube-zn.png',
+			'../skytex/sky-visible-cube-xp.png',
+			'../skytex/sky-visible-cube-xn.png',
+			'../skytex/sky-visible-cube-yp.png',
+			'../skytex/sky-visible-cube-yn.png',
+			'../skytex/sky-visible-cube-zp.png',
+			'../skytex/sky-visible-cube-zn.png',
 		},
-		wrap={
-			s=gl.GL_CLAMP_TO_EDGE,
-			t=gl.GL_CLAMP_TO_EDGE,
-			r=gl.GL_CLAMP_TO_EDGE,
+		wrap = {
+			s = gl.GL_CLAMP_TO_EDGE,
+			t = gl.GL_CLAMP_TO_EDGE,
+			r = gl.GL_CLAMP_TO_EDGE,
 		},
 		magFilter = gl.GL_LINEAR,
 		minFilter = gl.GL_LINEAR,
 	}
 
 	local shaderDefs = [[
-#define DLAMBDA .1
 #define M_PI ]]..('%.49f'):format(math.pi)..'\n'..[[
-#define ITERATIONS 1
 
-#define SCHWARZSCHILD_CARTESIAN
+//#define SCHWARZSCHILD_CARTESIAN
 //#define SCHWARZSCHILD_SPHERIC
-//#define ALCUBIERRE
+#define ALCUBIERRE
 
 #ifdef SCHWARZSCHILD_CARTESIAN
 #define EVENT_HORIZON_RADIUS	1.
@@ -132,11 +130,14 @@ function App:initGL()
 #define COORDINATE_CENTER		vec3(0., 3., 0.);
 #define TO_COORDINATES(v)		(v)
 #define FROM_COORDINATES(v)		(v)
-#define WARP_BUBBLE_RADIUS		2.
+#define WARP_BUBBLE_RADIUS		1.
 #define WARP_BUBBLE_DISTANCE	2.
-#define WARP_BUBBLE_VELOCITY	.9
-#define	WARP_THICKNESS			.1
+#define WARP_BUBBLE_VELOCITY	1.5
+#define	WARP_THICKNESS			.01
 #endif
+
+uniform int iterationsPerUpdate;
+uniform float dLambda;
 
 /*
 x = r
@@ -167,10 +168,12 @@ vec4 sphericToEuclidian(vec4 rhpt) {
 	return xyzt;
 }
 
+#if 0
 float tanh(float x) {
 	float exp2x = exp(2. * x);
 	return (exp2x - 1.) / (exp2x + 1.);
 }
+#endif
 
 float sech(float x) {
 	float expx = exp(x);
@@ -296,7 +299,7 @@ void main() {
 	vec4 relDiff = texture(velTex, tc);
 
 	//integrate along geodesic
-	for (int i = 0; i < ITERATIONS; i++) {
+	for (int i = 0; i < iterationsPerUpdate; i++) {
 		//-x''^a = Γ^a_bc x'^b x'^c
 		vec4 negRelDiff2;
 
@@ -369,8 +372,8 @@ void main() {
 			+ 2. * fz * WARP_BUBBLE_VELOCITY / 2. * relDiff.w * relDiff.x
 		;
 #endif
-		rel += DLAMBDA * relDiff;
-		relDiff -= DLAMBDA * negRelDiff2;
+		rel += dLambda * relDiff;
+		relDiff -= dLambda * negRelDiff2;
 	}
 
 	$assign
@@ -559,12 +562,6 @@ function App:event(e)
 	end
 end
 
-function App:updateGUI()
-	ig.igText'testing testing'
-	ig.luatableInputFloat('delta lambda', _G, 'deltaLambdaPtr')
-	ig.luatableInputInt('iterations', _G, 'iterationsPtr')
-end
-
 function App:update()
 	local view = self.view
 	local viewWidth, viewHeight = self.width, self.height
@@ -619,6 +616,8 @@ view.pos = oldpos
 				uniforms = {
 					projMat = self.fboProjMat.ptr,
 					mvMat = self.identMat.ptr,
+					dLambda = dLambda,
+					iterationsPerUpdate = iterationsPerUpdate,
 				},
 				texs = {
 					lightPosTexs[1],
@@ -661,6 +660,15 @@ view.pos = oldpos
 
 glreport'update done'
 	App.super.update(self)
+end
+
+function App:updateGUI()
+	ig.igText'testing testing'
+	if ig.igButton'reset' then
+		lightInitialized = false
+	end
+	ig.luatableInputFloat('delta lambda', _G, 'dLambda')
+	ig.luatableInputInt('iterations', _G, 'iterationsPerUpdate')
 end
 
 return App():run()

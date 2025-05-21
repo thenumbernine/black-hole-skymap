@@ -318,7 +318,7 @@ preload(skyTexFilenames, () => {
 
 	console.log('creating skyTex', skyTexFilenames);
 	const skyTex = new glutil.TextureCube({
-		flipY : true,
+		flipY : false,
 		generateMipmap : true,
 		magFilter : gl.LINEAR,
 		minFilter : gl.LINEAR_MIPMAP_LINEAR,
