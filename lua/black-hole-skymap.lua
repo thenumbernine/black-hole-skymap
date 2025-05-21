@@ -166,10 +166,12 @@ vec4 sphericToEuclidian(vec4 rhpt) {
 	return xyzt;
 }
 
+#if 0	// when is this defined?
 float tanh(float x) {
 	float exp2x = exp(2. * x);
 	return (exp2x - 1.) / (exp2x + 1.);
 }
+#endif
 
 float sech(float x) {
 	float expx = exp(x);
