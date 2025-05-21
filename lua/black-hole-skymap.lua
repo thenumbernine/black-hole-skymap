@@ -27,7 +27,6 @@ christoffel symbols:
 local ffi = require 'ffi'
 local table = require 'ext.table'
 local gl = require 'gl'
-local glu = require 'ffi.req' 'glu'
 local sdl = require 'sdl'
 local ig = require 'imgui'
 local vec2d = require 'vec-ffi.vec2d'
