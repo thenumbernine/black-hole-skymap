@@ -28,7 +28,7 @@ local bit = require 'bit'
 local ffi = require 'ffi'
 local gl = require 'gl'
 local glu = require 'ffi.req' 'glu'
-local sdl = require 'ffi.req' 'sdl'
+local sdl = require 'sdl'
 local ig = require 'imgui'
 local vec2d = require 'vec-ffi.vec2d'
 local vec3d = require 'vec-ffi.vec3d'
@@ -443,11 +443,11 @@ end
 
 function App:event(event, eventPtr)
 	App.super.event(self, event, eventPtr)
-	if event.type == sdl.SDL_MOUSEMOTION then
+	if event.type == sdl.SDL_EVENT_MOUSE_MOTION then
 		if leftButtonDown then
 			lightInitialized = false
 		end
-	elseif event.type == sdl.SDL_MOUSEBUTTONDOWN then
+	elseif event.type == sdl.SDL_EVENT_MOUSE_BUTTON_DOWN then
 		if event.button.button == sdl.SDL_BUTTON_LEFT then
 			leftButtonDown = true
 		elseif event.button.button == sdl.SDL_BUTTON_WHEELUP then
@@ -455,14 +455,14 @@ function App:event(event, eventPtr)
 		elseif event.button.button == sdl.SDL_BUTTON_WHEELDOWN then
 			lightInitialized = false
 		end
-	elseif event.type == sdl.SDL_MOUSEBUTTONUP then
+	elseif event.type == sdl.SDL_EVENT_MOUSE_BUTTON_UP then
 		if event.button.button == sdl.SDL_BUTTON_LEFT then
 			leftButtonDown = false
 		end
-	elseif event.type == sdl.SDL_KEYDOWN then
-		if event.key.keysym.sym == sdl.SDLK_i then
+	elseif event.type == sdl.SDL_EVENT_KEY_DOWN then
+		if event.key.key == sdl.SDLK_I then
 			doIteration = 2
-		elseif event.key.keysym.sym == sdl.SDLK_j then
+		elseif event.key.key == sdl.SDLK_J then
 			doIteration = 1
 		end
 	end

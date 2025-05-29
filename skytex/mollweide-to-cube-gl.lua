@@ -2,7 +2,7 @@ local openglapp = require 'openglapp'
 local bit = require 'bit'
 local gl = require 'gl'
 local glu = require 'ffi.req' 'glu'
-local sdl = require 'ffi.req' 'sdl'
+local sdl = require 'sdl'
 local Quat = require 'vec.quat'
 local vec2 = require 'vec.vec2'
 require 'glutil.tex'
@@ -170,7 +170,7 @@ openglapp:run{
 		gl.glClearColor(.3, .3, .3, 1)
 	end,
 	event = function(event)
-		if event.type == sdl.SDL_MOUSEMOTION then
+		if event.type == sdl.SDL_EVENT_MOUSE_MOTION then
 			if leftButtonDown then
 				local idx = event.motion.xrel
 				local idy = event.motion.yrel
@@ -180,7 +180,7 @@ openglapp:run{
 				local r = Quat():fromAngleAxis(dy, dx, 0, magn)
 				viewRot = (r * viewRot):normalize()
 			end
-		elseif event.type == sdl.SDL_MOUSEBUTTONDOWN then
+		elseif event.type == sdl.SDL_EVENT_MOUSE_BUTTON_DOWN then
 			if event.button.button == sdl.SDL_BUTTON_LEFT then
 				leftButtonDown = true
 			elseif event.button.button == sdl.SDL_BUTTON_WHEELUP then
@@ -188,7 +188,7 @@ openglapp:run{
 			elseif event.button.button == sdl.SDL_BUTTON_WHEELDOWN then
 				zoomScale = zoomScale * zoomFactor
 			end
-		elseif event.type == sdl.SDL_MOUSEBUTTONUP then
+		elseif event.type == sdl.SDL_EVENT_MOUSE_BUTTON_UP then
 			if event.button.button == sdl.SDL_BUTTON_LEFT then
 				leftButtonDown = false
 			end

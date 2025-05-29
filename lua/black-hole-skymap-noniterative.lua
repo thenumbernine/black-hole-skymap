@@ -27,7 +27,7 @@ local bit = require 'bit'
 local ffi = require 'ffi'
 local gl = require 'gl'
 local glu = require 'ffi.req' 'glu'
-local sdl = require 'ffi.req' 'sdl'
+local sdl = require 'sdl'
 
 --local tw = require 'ffi.req' 'anttweakbar'
 
@@ -66,13 +66,11 @@ cubeFaces = {
 local deltaLambdaPtr = ffi.new('double[1]', 1.)
 local iterationsPtr = ffi.new('int[1]', 1)
 
-local sdlVersion = ffi.new('SDL_version[1]')
 local sdlEventCopy = ffi.new('SDL_Event[1]')	-- for anttweakbar
 
 openglapp:run{
 	init = function()
-		sdl.SDL_GetVersion(sdlVersion)
-
+--[[
 		if tw then
 			tw.TwInit(tw.TW_OPENGL, nil)
 
@@ -84,7 +82,8 @@ openglapp:run{
 			tw.TwAddVarRW(bar, 'deltalambda', tw.TW_TYPE_DOUBLE, deltaLambdaPtr, " label='delta lambda' min=0 max=10 step=0.01 keyIncr=l keyDecr=L help='delta lambda'")
 			tw.TwAddVarRW(bar, 'iterations', tw.TW_TYPE_INT32, iterationsPtr, " label='iterations' min=0 max=1000 step=1 keyIncr=i keyDecr=I help='iterations'")
 		end
-		
+--]]
+
 		skyTex = TexCube{
 			filenames = {
 				'skytex/sky-infrared-cube-xp.png',
@@ -258,8 +257,8 @@ void main() {
 	end,
 	event = function(event)
 		sdlEventCopy[0] = event	-- memcpy I hope
-		if tw and 0 ~= tw.TwEventSDL(sdlEventCopy, sdlVersion[0].major, sdlVersion[0].minor) then return end
-		if event.type == sdl.SDL_MOUSEMOTION then
+		--if tw and 0 ~= tw.TwEventSDL(sdlEventCopy, sdlVersion[0].major, sdlVersion[0].minor) then return end
+		if event.type == sdl.SDL_EVENT_MOUSE_MOTION then
 			if leftButtonDown then
 				local idx = event.motion.xrel
 				local idy = event.motion.yrel
@@ -269,7 +268,7 @@ void main() {
 				local r = Quat():fromAngleAxis(dy, dx, 0, -magn)
 				viewRot = (r * viewRot):normalize()
 			end
-		elseif event.type == sdl.SDL_MOUSEBUTTONDOWN then
+		elseif event.type == sdl.SDL_EVENT_MOUSE_BUTTON_DOWN then
 			if event.button.button == sdl.SDL_BUTTON_LEFT then
 				leftButtonDown = true
 			elseif event.button.button == sdl.SDL_BUTTON_WHEELUP then
@@ -277,7 +276,7 @@ void main() {
 			elseif event.button.button == sdl.SDL_BUTTON_WHEELDOWN then
 				tanFov = tanFov / zoomFactor
 			end
-		elseif event.type == sdl.SDL_MOUSEBUTTONUP then
+		elseif event.type == sdl.SDL_EVENT_MOUSE_BUTTON_UP then
 			if event.button.button == sdl.SDL_BUTTON_LEFT then
 				leftButtonDown = false
 			end
