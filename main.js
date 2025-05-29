@@ -1,6 +1,7 @@
+import {Canvas, Option} from '/js/dom.js';
 import {mat4, quat} from '/js/gl-matrix-3.4.1/index.js';
 import {assert, assertExists} from '/js/util.js';
-import {DOM, getIDs, removeFromParent, preload, hide, show, hidden} from '/js/util.js';
+import {clamp, getIDs, removeFromParent, preload, hide, show, hidden} from '/js/util.js';
 import {GLUtil} from '/js/gl-util.js';
 import {Mouse3D} from '/js/mouse3d.js';
 import {makeTextureCube} from '/js/gl-util-TextureCube.js';
@@ -176,8 +177,8 @@ ids.infoButton.addEventListener('click', e => {
 	}
 });
 
-canvas = DOM('canvas', {
-	css : {
+canvas = Canvas({
+	style : {
 		left : 0,
 		top : 0,
 		position : 'absolute',
@@ -205,7 +206,7 @@ objectTypes.forEach(v => {
 		return;
 	}
 	objectTypeParamDivs[v] = ids[id];
-	const option = DOM('option', {text:v, appendTo:ids.objectTypes});
+	const option = Option({innerText:v, appendTo:ids.objectTypes});
 	if (v == _G.objectType) {
 		option.setAttribute('selected', 'true');
 	}
@@ -317,7 +318,7 @@ preload(skyTexFilenames, () => {
 
 	console.log('creating skyTex', skyTexFilenames);
 	const skyTex = new glutil.TextureCube({
-		flipY : true,
+		flipY : false,
 		generateMipmap : true,
 		magFilter : gl.LINEAR,
 		minFilter : gl.LINEAR_MIPMAP_LINEAR,
@@ -372,7 +373,7 @@ console.log('3');
 				},
 				zoom : function(dz) {
 					glutil.view.fovY *= Math.exp(-.0003 * dz);
-					glutil.view.fovY = Math.clamp(glutil.view.fovY, 1, 179);
+					glutil.view.fovY = clamp(glutil.view.fovY, 1, 179);
 					glutil.updateProjection();
 				}
 			});

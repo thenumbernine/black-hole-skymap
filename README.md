@@ -1,9 +1,8 @@
 [![Donate via Stripe](https://img.shields.io/badge/Donate-Stripe-green.svg)](https://buy.stripe.com/00gbJZ0OdcNs9zi288)<br>
-[![Donate via Bitcoin](https://img.shields.io/badge/Donate-Bitcoin-green.svg)](bitcoin:37fsp7qQKU8XoHZGRQvVzQVP8FrEJ73cSJ)<br>
 
 ## Black Hole Raytrace Simulator
 
-http://christopheremoore.net/black-hole-skymap/
+[Launch](https://thenumbernine.github.io/black-hole-skymap)
 
 raytraces relativistic phenomena such as black holes and Alcubierre warp drive bubbles
 
@@ -30,7 +29,6 @@ myself from writing a 24bpp fixed-point-precision raytracer.
 
 # A NOTE TO ANYONE FOLLOWING THE LINK FROM http://spiro.fisica.unipd.it/~antonell/schwarzschild/
 
-This guy was kind enough to reference this page and publicise a previous math error I had made (I had left out of the LaTeX description the cross terms in the Cartesian form of the Schwarzschild metric). If only he was kind enough to attempt to contact me in private first, I could have reminded him that the renderer implementation's geodesic calculations were based on the correct pseudo-Cartesian metric all along. Here's where I got the metric from:  [Catalogue of Spacetimes](https://arxiv.org/abs/0904.4184) by Mueller & Grave. Here's my [geodesic calculations](http://christopheremoore.net/symbolic-lua/test-output/Schwarzschild%20-%20Cartesian.html) based on my [Computer Algebra System](http://christopheremoore.net/symbolic-lua) in Lua.
+This guy was kind enough to reference this page and publicise a previous math error I had made (I had left out of the LaTeX description the cross terms in the Cartesian form of the Schwarzschild metric). If only he was kind enough to attempt to contact me in private first, I could have reminded him that the renderer implementation's geodesic calculations were based on the correct pseudo-Cartesian metric all along. Here's where I got the metric from:  [Catalogue of Spacetimes](https://arxiv.org/abs/0904.4184) by Mueller & Grave. Here's my [geodesic calculations](http://thenumbernine.github.io/lua/symmath/tests/output/Schwarzschild%20-%20Cartesian.html) based on my [Computer Algebra System](http://christopheremoore.net/symbolic-lua) in Lua.
 
 For what it's worth, as long as he's doing his calculations in spherical coordinates, he is going to run into numerical errors at the poles -- which he probably won't overcome until he makes the switch to pseudo-Cartesian as well.  This is probably why his orbiting view is fixed to the equatorial plane.
-

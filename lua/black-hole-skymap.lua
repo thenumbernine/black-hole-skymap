@@ -5,41 +5,41 @@ cube map render
 shader that iterates along geodesic from the view plane backwards through time to infinity
 then reprojects onto the cubemap
 
-schwarzschild metric: ds^2 = -(1-R/r)dt^2 + 1/(1-R/r)dr^2 + r^2 (dθ^2 + sin(θ)^2 dφ^2)
+schwarzschild metric: ds² = -(1-R/r)dt² + 1/(1-R/r)dr² + r² (dθ² + sin(θ)² dφ²)
 where R = 2M is the schwarzschild radius
 
 christoffel symbols:
 
-conn^r_tt = R(r-R)/(2r^3)
-conn^t_tr = -conn^r_rr = R/(2r(r-R))
-conn^φ_rφ = conn^θ_rθ = 1/r
-conn^r_φφ = -(r - R)
-conn^θ_φθ = cos(φ)/sin(φ)
-conn^r_θθ = -(r - R) sin(φ)^2
-conn^φ_θθ = -sin(φ) cos(φ)
+Γ^r_tt = R(r-R)/(2r³)
+Γ^t_tr = -Γ^r_rr = R/(2r(r-R))
+Γ^φ_rφ = Γ^θ_rθ = 1/r
+Γ^r_φφ = -(r - R)
+Γ^θ_φθ = cos(φ)/sin(φ)
+Γ^r_θθ = -(r - R) sin(φ)²
+Γ^φ_θθ = -sin(φ) cos(φ)
 
 -t'' = R/(r(r-R)) t' r'
--r'' = R(r-R)/(2r^3) t'^2 - R/(2r(r-R)) r'^2 - (r - R) φ'^2 - (r - R) sin(φ)^2 θ'^2
+-r'' = R(r-R)/(2r³) t'² - R/(2r(r-R)) r'² - (r - R) φ'² - (r - R) sin(φ)² θ'²
 -θ'' = 2/r r' θ' + 2 cos(φ)/sin(φ) φ' θ'
--φ'' = 2/r r' φ' - sin(φ) cos(φ) θ'^2
+-φ'' = 2/r r' φ' - sin(φ) cos(φ) θ'²
 --]]
 
-local bit = require 'bit'
 local ffi = require 'ffi'
+local table = require 'ext.table'
 local gl = require 'gl'
-local glu = require 'ffi.req' 'glu'
 local sdl = require 'sdl'
 local ig = require 'imgui'
 local vec2d = require 'vec-ffi.vec2d'
 local vec3d = require 'vec-ffi.vec3d'
 local quatd = require 'vec-ffi.quatd'
+local matrix_ffi = require 'matrix.ffi'
 local GLTex2D = require 'gl.tex2d'
 local GLTexCube = require 'gl.texcube'
-local GLProgram = require 'gl.program'
+local GLGeometry = require 'gl.geometry'
+local GLSceneObject = require 'gl.sceneobject'
 local FBO = require 'gl.fbo'
 local glreport = require 'gl.report'
 
-local skyTex
 --local viewRot = quatd(0,math.sqrt(.5),0,math.sqrt(.5))*quatd(math.sqrt(.5),0,0,-math.sqrt(.5))
 --local viewAngleAxis = quatd(0,0,0,1)
 --local zNear = .1
@@ -50,74 +50,65 @@ local leftButtonDown
 
 local doIteration = 2
 local lightInitialized = false
-local drawLightShader
-local initLightPosShader, initLightVelShader
-local iterateLightPosShader, iterateLightVelShader
 local lightPosTexs = {}
 local lightVelTexs = {}
 local fbo
 
--- notice that the order matches global 'sides'
-cubeFaces = {
-	{5,7,3,1};		-- <- each value has the x,y,z in the 0,1,2 bits (off = 0, on = 1)
-	{6,4,0,2};
-	{2,3,7,6};
-	{4,5,1,0};
-	{6,7,5,4};
-	{0,1,3,2};
-}
-
-local uvs = {
-	vec2d(0,0),
-	vec2d(1,0),
-	vec2d(1,1),
-	vec2d(0,1),
-}
-
 -- _G for input
-deltaLambdaPtr = 1
-iterationsPtr = 1
+dLambda = 1
+iterationsPerUpdate = 1
 
-local App = require 'imguiapp.withorbit'()
-
+local App = require 'imgui.appwithorbit'()
 App.title = 'black hole raytracer'
 App.viewDist = 20
 
 function App:initGL()
 	App.super.initGL(self)
 
-	self.view.angle = 
+	self.fboProjMat = matrix_ffi({4,4}, 'float'):zeros():setOrtho(0, 1, 0, 1, -1, 1)
+	self.identMat = matrix_ffi({4,4}, 'float'):zeros():setIdent()
+
+	self.view.angle =
 		quatd(-math.sqrt(.5), 0, 0, -math.sqrt(.5))
 		* quatd(0, -math.sqrt(.5), 0, math.sqrt(.5))
 
-	skyTex = GLTexCube{
-		filenames = {
-			'../skytex/sky-infrared-cube-xp.png',
-			'../skytex/sky-infrared-cube-xn.png',
-			'../skytex/sky-infrared-cube-yp.png',
-			'../skytex/sky-infrared-cube-yn.png',
-			'../skytex/sky-infrared-cube-zp.png',
-			'../skytex/sky-infrared-cube-zn.png',
+	local quadGeom = GLGeometry{
+		mode = gl.GL_TRIANGLE_STRIP,
+		vertexes = {
+			dim = 2,
+			data = 	{
+				0, 0,
+				1, 0,
+				0, 1,
+				1, 1,
+			},
 		},
-		wrap={
-			s=gl.GL_CLAMP_TO_EDGE,
-			t=gl.GL_CLAMP_TO_EDGE,
-			r=gl.GL_CLAMP_TO_EDGE,
+	}
+
+	local skyTex = GLTexCube{
+		filenames = {
+			'../skytex/sky-visible-cube-xp.png',
+			'../skytex/sky-visible-cube-xn.png',
+			'../skytex/sky-visible-cube-yp.png',
+			'../skytex/sky-visible-cube-yn.png',
+			'../skytex/sky-visible-cube-zp.png',
+			'../skytex/sky-visible-cube-zn.png',
+		},
+		wrap = {
+			s = gl.GL_CLAMP_TO_EDGE,
+			t = gl.GL_CLAMP_TO_EDGE,
+			r = gl.GL_CLAMP_TO_EDGE,
 		},
 		magFilter = gl.GL_LINEAR,
 		minFilter = gl.GL_LINEAR,
 	}
-		
+
 	local shaderDefs = [[
-#version 120
+#define M_PI ]]..('%.49f'):format(math.pi)..'\n'..[[
 
-#define DLAMBDA .1
-#define M_PI 3.14159265358979311599796346854418516159057617187500
-#define ITERATIONS 1
-
-#define SCHWARZSCHILD_CARTESIAN
+//#define SCHWARZSCHILD_CARTESIAN
 //#define SCHWARZSCHILD_SPHERIC
-//#define ALCUBIERRE
+#define ALCUBIERRE
 
 #ifdef SCHWARZSCHILD_CARTESIAN
 #define EVENT_HORIZON_RADIUS	1.
@@ -138,18 +129,21 @@ function App:initGL()
 #define COORDINATE_CENTER		vec3(0., 3., 0.);
 #define TO_COORDINATES(v)		(v)
 #define FROM_COORDINATES(v)		(v)
-#define WARP_BUBBLE_RADIUS		2.
+#define WARP_BUBBLE_RADIUS		1.
 #define WARP_BUBBLE_DISTANCE	2.
-#define WARP_BUBBLE_VELOCITY	.9
-#define	WARP_THICKNESS			.1
+#define WARP_BUBBLE_VELOCITY	1.5
+#define	WARP_THICKNESS			.01
 #endif
+
+uniform int iterationsPerUpdate;
+uniform float dLambda;
 
 /*
 x = r
 y = polar angle
 z = inclination angle
 */
-		
+
 vec4 euclidianToSpheric(vec4 xyzt) {
 	vec4 rhpt;
 	float r2 = length(xyzt.xy);	//length in xy
@@ -173,10 +167,12 @@ vec4 sphericToEuclidian(vec4 rhpt) {
 	return xyzt;
 }
 
+#if 0	// when is this defined?
 float tanh(float x) {
 	float exp2x = exp(2. * x);
 	return (exp2x - 1.) / (exp2x + 1.);
 }
+#endif
 
 float sech(float x) {
 	float expx = exp(x);
@@ -195,38 +191,43 @@ inverse camera parameters:
 [R^-1 0] [1 -T]   [R^-1, -R^-1 T]
 [0    1] [0  1] = [   0,    1   ]
 --]]
-	local initLightShaderVertexCode = shaderDefs .. [[
-varying vec3 eyePos;
-varying vec3 vtxPos;
+	local initLightShaderVertexCode = [[
+in vec2 vertex;
+out vec3 eyePos;
+out vec3 vtxPos;
+uniform mat4 projMat, mvMat;
+uniform vec2 tanFov;
 void main() {
-	mat3 rot = transpose(mat3(
-		gl_ModelViewMatrix[0].xyz,
-		gl_ModelViewMatrix[1].xyz,
-		gl_ModelViewMatrix[2].xyz));
-	eyePos = -rot * gl_ModelViewMatrix[3].xyz;
-	vtxPos = rot * gl_Vertex.xyz + eyePos;
+	vec3 vtx3 = vec3((vertex - .5) * 2. * tanFov, -1.);
 
-	gl_Position = gl_ProjectionMatrix * gl_Vertex;
+	mat3 rot = transpose(mat3(
+		mvMat[0].xyz,
+		mvMat[1].xyz,
+		mvMat[2].xyz));
+	eyePos = -rot * mvMat[3].xyz;
+	vtxPos = rot * vtx3 + eyePos;
+	gl_Position = projMat * vec4(vtx3, 1.);
 }
 ]]
 
 	local initLightShaderFragmentCode = shaderDefs .. [[
-varying vec3 eyePos;
-varying vec3 vtxPos;
+in vec3 eyePos;
+in vec3 vtxPos;
+out vec4 fragColor;
 
 void main() {
-	vec4 rel = vec4(eyePos, 1.); 
+	vec4 rel = vec4(eyePos, 1.);
 	vec4 relDirEnd = vec4(vtxPos - eyePos, 1.);
 
 	//convert to spherical coordinates for iteration
 	rel = TO_COORDINATES(rel);
-	
+
 	//find the difference of a vector pointing in the initial direction, in the black hole's spherical coordinates
 	relDirEnd = TO_COORDINATES(relDirEnd);
 
 	//get the direction difference in spheric coordinates
 	vec4 relDiff = relDirEnd - rel;
-	
+
 	//...and start us off in the view plane
 	rel = relDirEnd;
 
@@ -234,27 +235,41 @@ void main() {
 }
 ]]
 
-	initLightPosShader = GLProgram{
-		vertexCode = initLightShaderVertexCode,
-		fragmentCode = initLightShaderFragmentCode:gsub('$assign', 'gl_FragColor = rel;'),
-	}:useNone()
-	
-	initLightVelShader = GLProgram{
-		vertexCode = initLightShaderVertexCode,
-		fragmentCode = initLightShaderFragmentCode:gsub('$assign', 'gl_FragColor = relDiff;'),
-	}:useNone()
-	
+	initLightPosObj = GLSceneObject{
+		geometry = quadGeom,
+		program = {
+			version = 'latest',
+			precision = 'best',
+			vertexCode = shaderDefs
+				.. initLightShaderVertexCode,
+			fragmentCode = initLightShaderFragmentCode
+				:gsub('$assign', 'fragColor = rel;'),
+		},
+	}
+
+	initLightVelObj = GLSceneObject{
+		geometry = quadGeom,
+		program = {
+			version = 'latest',
+			precision = 'best',
+			vertexCode = shaderDefs
+				.. initLightShaderVertexCode,
+			fragmentCode = initLightShaderFragmentCode
+				:gsub('$assign', 'fragColor = relDiff;'),
+		},
+	}
+
 	local lightRes = 1024
 	for _,texs in ipairs{lightPosTexs, lightVelTexs} do
 		for i=1,2 do
 			texs[i] = GLTex2D{
-				width=lightRes,
-				height=lightRes,
-				format=gl.GL_RGBA,
-				type=gl.GL_FLOAT,
-				internalFormat=gl.GL_RGBA32F,
-				minFilter=gl.GL_NEAREST,
-				magFilter=gl.GL_NEAREST,
+				width = lightRes,
+				height = lightRes,
+				format = gl.GL_RGBA,
+				type = gl.GL_FLOAT,
+				internalFormat = gl.GL_RGBA32F,
+				minFilter = gl.GL_NEAREST,
+				magFilter = gl.GL_NEAREST,
 			}
 		end
 	end
@@ -262,28 +277,31 @@ void main() {
 	fbo = FBO{width=lightRes, height=lightRes}:unbind()
 
 	local iterateLightShaderVertexCode = [[
-varying vec2 tc;
+in vec2 vertex;
+out vec2 tc;
+uniform mat4 projMat, mvMat;
 void main() {
-	tc = gl_Vertex.xy;
-	gl_Position = ftransform();
+	tc = vertex;
+	gl_Position = projMat * mvMat * vec4(vertex, 0., 1.);
 }
 ]]
 
-	local iterateLightShaderFragmentCode = shaderDefs .. [[
+	local iterateLightShaderFragmentCode = [[
+in vec2 tc;
+out vec4 fragColor;
 
 uniform sampler2D posTex;
 uniform sampler2D velTex;
-varying vec2 tc;
 void main() {
 
-	vec4 rel = texture2D(posTex, tc);
-	vec4 relDiff = texture2D(velTex, tc);
-	
+	vec4 rel = texture(posTex, tc);
+	vec4 relDiff = texture(velTex, tc);
+
 	//integrate along geodesic
-	for (int i = 0; i < ITERATIONS; i++) {
-		//-x''^a = conn^a_bc x'^b x'^c
+	for (int i = 0; i < iterationsPerUpdate; i++) {
+		//-x''^a = Γ^a_bc x'^b x'^c
 		vec4 negRelDiff2;
-	
+
 #ifdef SCHWARZSCHILD_CARTESIAN
 		float r = length(rel.xyz);
 		float posDotVel = dot(rel.xyz, relDiff.xyz);
@@ -353,31 +371,44 @@ void main() {
 			+ 2. * fz * WARP_BUBBLE_VELOCITY / 2. * relDiff.w * relDiff.x
 		;
 #endif
-		rel += DLAMBDA * relDiff;
-		relDiff -= DLAMBDA * negRelDiff2;
+		rel += dLambda * relDiff;
+		relDiff -= dLambda * negRelDiff2;
 	}
 
 	$assign
 }
 ]]
-	local iterateLightShaderUniforms = {
-		posTex = 0,
-		velTex = 1,
+
+	iterateLightPosObj = GLSceneObject{
+		geometry = quadGeom,
+		program = {
+			version = 'latest',
+			precision = 'best',
+			vertexCode = iterateLightShaderVertexCode,
+			fragmentCode = shaderDefs .. iterateLightShaderFragmentCode
+				:gsub('$assign', 'fragColor = rel;'),
+			uniforms = {
+				posTex = 0,
+				velTex = 1,
+			},
+		},
 	}
-	
-	iterateLightPosShader = GLProgram{
-		vertexCode = iterateLightShaderVertexCode,
-		fragmentCode = iterateLightShaderFragmentCode:gsub('$assign', 'gl_FragColor = rel;'),
-		uniforms = iterateLightShaderUniforms,
-	}:useNone()
-	
-	iterateLightVelShader = GLProgram{
-		vertexCode = iterateLightShaderVertexCode,
-		fragmentCode = iterateLightShaderFragmentCode:gsub('$assign', 'gl_FragColor = relDiff;'),
-		uniforms = iterateLightShaderUniforms,
-	}:useNone()
-	
-		
+
+	iterateLightVelObj = GLSceneObject{
+		geometry = quadGeom,
+		program = {
+			version = 'latest',
+			precision = 'best',
+			vertexCode = iterateLightShaderVertexCode,
+			fragmentCode = shaderDefs .. iterateLightShaderFragmentCode
+				:gsub('$assign', 'fragColor = relDiff;'),
+			uniforms = {
+				posTex = 0,
+				velTex = 1,
+			},
+		},
+	}
+
 --[[
 how it'll work ...
 1) start with the normalized world vector
@@ -386,59 +417,121 @@ how it'll work ...
 
 you could do the iteration in the shader loop, or you could use a fbo to store state information ...
 --]]
-	drawLightShader = GLProgram{
-		vertexCode=[[
-varying vec2 tc;
+	drawLightSceneObj = GLSceneObject{
+		geometry = quadGeom,
+		program = {
+			version = 'latest',
+			precision = 'best',
+			vertexCode = [[
+in vec2 vertex;
+out vec2 tc;
+uniform mat4 projMat;
 void main() {
-	tc = gl_Vertex.xy;
-	gl_Position = gl_ProjectionMatrix * gl_Vertex;
+	tc = vertex;
+	gl_Position = projMat * vec4(vertex, 0., 1.);
 }
 ]],
-		fragmentCode = shaderDefs .. [[
+			fragmentCode = shaderDefs .. [[
+in vec2 tc;
+out vec4 fragColor;
 uniform sampler2D posTex;
 uniform samplerCube cubeTex;
-varying vec2 tc;
 
 void main() {
-	vec4 rel = texture2D(posTex, tc);
-	
+	vec4 rel = texture(posTex, tc);
+
 #if 0
 	//warn if the light ended up in the event horizon
 	if (rel.x <= EVENT_HORIZON_RADIUS) {
-		gl_FragColor = vec4(tc.x, tc.y, 0., 1.);
-	} else 
+		fragColor = vec4(tc.x, tc.y, 0., 1.);
+	} else
 #endif
 	{
 		//convert back to euclidian space
 		vec3 result = FROM_COORDINATES(rel).xyz;
-		
+
 		//convert from black-hole-centered to view-centered
-		//result += gl_ModelViewMatrix[3].xyz;
-		result += COORDINATE_CENTER; 
+		//result += mvMat[3].xyz;
+		result += COORDINATE_CENTER;
 		//result += vec3(
-		//	dot(gl_ModelViewMatrix[0].xyz, gl_ModelViewMatrix[3].xyz),
-		//	dot(gl_ModelViewMatrix[1].xyz, gl_ModelViewMatrix[3].xyz),
-		//	dot(gl_ModelViewMatrix[2].xyz, gl_ModelViewMatrix[3].xyz));
-		
+		//	dot(mvMat[0].xyz, mvMat[3].xyz),
+		//	dot(mvMat[1].xyz, mvMat[3].xyz),
+		//	dot(mvMat[2].xyz, mvMat[3].xyz));
+
 		//with distortion
-		gl_FragColor = textureCube(cubeTex, result);
-		
+		fragColor = texture(cubeTex, result);
+
 		//no distortion
-	//	gl_FragColor = textureCube(cubeTex, pos);
+	//	fragColor = texture(cubeTex, pos);
 
 		//difference
-	//	vec4 color = textureCube(cubeTex, result) - textureCube(cubeTex, pos);
-	//	gl_FragColor = vec4(abs(color.x), abs(color.y), abs(color.z), abs(color.w));
+	//	vec4 color = texture(cubeTex, result) - texture(cubeTex, pos);
+	//	fragColor = vec4(abs(color.x), abs(color.y), abs(color.z), abs(color.w));
 	}
 }
 ]],
-		uniforms = {
-			posTex = 0,
-			cubeTex = 1,
+			uniforms = {
+				posTex = 0,
+				cubeTex = 1,
+			},
 		},
-	}:useNone()
-	
-	gl.glClearColor(.3, .3, .3, 1)		
+		texs = {
+			[2] = skyTex,
+		},
+	}
+
+	local vtxdata = table()
+	for _,face in ipairs(table{
+		-- <- each value has the x,y,z in the 0,1,2 bits (off = 0, on = 1)
+		{5,7,3,1},
+		{6,4,0,2},
+		{2,3,7,6},
+		{4,5,1,0},
+		{6,7,5,4},
+		{0,1,3,2},
+	}) do
+		for ibase=0,3 do
+			for iofs=0,1 do
+				local i = face[((ibase + iofs)%4)+1]
+				local s = 1
+				local x = bit.band(i, 1)
+				local y = bit.band(bit.rshift(i, 1), 1)
+				local z = bit.band(bit.rshift(i, 2), 1)
+				vtxdata:insert(s*(x*2-1))
+				vtxdata:insert(s*(y*2-1))
+				vtxdata:insert(s*(z*2-1))
+			end
+		end
+	end
+
+	self.wireframeSceneObj = GLSceneObject{
+		vertexes = {
+			dim = 3,
+			data = vtxdata,
+		},
+		geometry = {
+			mode = gl.GL_LINES,
+		},
+		program = {
+			version = 'latest',
+			precision = 'best',
+			vertexCode = [[
+in vec3 vertex;
+uniform mat4 mvProjMat;
+void main() {
+	gl_Position = mvProjMat * vec4(vertex, 1.);
+}
+]],
+			fragmentCode = [[
+out vec4 fragColor;
+void main() {
+	fragColor = vec4(1., 1., 1., 1.);
+}
+]],
+		},
+	}
+
+	gl.glClearColor(.3, .3, .3, 1)
 end
 
 function App:event(event, eventPtr)
@@ -450,9 +543,9 @@ function App:event(event, eventPtr)
 	elseif event.type == sdl.SDL_EVENT_MOUSE_BUTTON_DOWN then
 		if event.button.button == sdl.SDL_BUTTON_LEFT then
 			leftButtonDown = true
-		elseif event.button.button == sdl.SDL_BUTTON_WHEELUP then
+		elseif e[0].button.button == sdl.SDL_BUTTON_WHEELUP then
 			lightInitialized = false
-		elseif event.button.button == sdl.SDL_BUTTON_WHEELDOWN then
+		elseif e[0].button.button == sdl.SDL_BUTTON_WHEELDOWN then
 			lightInitialized = false
 		end
 	elseif event.type == sdl.SDL_EVENT_MOUSE_BUTTON_UP then
@@ -467,22 +560,16 @@ function App:event(event, eventPtr)
 		end
 	end
 end
-	
-function App:updateGUI()
-	ig.igText'testing testing'
-	ig.luatableInputFloat('delta lambda', _G, 'deltaLambdaPtr')
-	ig.luatableInputInt('iterations', _G, 'iterationsPtr')
-end
-	
+
 function App:update()
 	local view = self.view
 	local viewWidth, viewHeight = self.width, self.height
 	local aspectRatio = viewWidth / viewHeight
-	
+
 	-- init light if necessary
 	if not lightInitialized then
 		lightInitialized = true
-		
+
 		gl.glViewport(0, 0, fbo.width, fbo.height)
 
 		local tanFovY = math.tan(view.fovY / 2)
@@ -493,55 +580,52 @@ view:setup(aspectRatio)
 view.pos = oldpos
 
 		for _,args in ipairs{
-			{tex=lightPosTexs[1], shader=initLightPosShader},
-			{tex=lightVelTexs[1], shader=initLightVelShader},
+			{tex=lightPosTexs[1], obj=initLightPosObj},
+			{tex=lightVelTexs[1], obj=initLightVelObj},
 		} do
-			fbo:draw{
-				dest = args.tex,
-				shader = args.shader,
-				callback = function()
-					gl.glBegin(gl.GL_QUADS)
-					for _,uv in ipairs(uvs) do
-						gl.glVertex3f((uv.x - .5) * 2 * tanFovX, 
-							(uv.y - .5) * 2 * tanFovY,
-							-1)
-					end
-					gl.glEnd()
-				end,
+			fbo:bind()
+			fbo:setColorAttachmentTex2D(args.tex.id)
+			fbo:check()
+			gl.glClear(gl.GL_COLOR_BUFFER_BIT)
+			args.obj:draw{
+				uniforms = {
+					tanFov = {tanFovX, tanFovY},
+					mvMat = view.mvMat.ptr,
+					projMat = view.projMat.ptr,
+				},
 			}
+			fbo:unbind()
 		end
 	end
 
 	if doIteration ~= 0 then
 		if doIteration == 1 then doIteration = 0 end
-		--print('iterating...')
+--print('iterating...')
 		gl.glViewport(0, 0, fbo.width, fbo.height)
-		gl.glClear(gl.GL_COLOR_BUFFER_BIT)
 
-		gl.glMatrixMode(gl.GL_PROJECTION)
-		gl.glLoadIdentity()
-		gl.glOrtho(0,1,0,1,-1,1)
-		gl.glMatrixMode(gl.GL_MODELVIEW)
-		gl.glLoadIdentity()
-		
 		for _,args in ipairs{
-			{tex=lightPosTexs[2].id, shader=iterateLightPosShader},
-			{tex=lightVelTexs[2].id, shader=iterateLightVelShader},
+			{tex=lightPosTexs[2], obj=iterateLightPosObj},
+			{tex=lightVelTexs[2], obj=iterateLightVelObj},
 		} do
-			fbo:draw{
-				dest = args.tex,
-				shader = args.shader,
-				texs = {lightPosTexs[1], lightVelTexs[1]},
-				callback = function()
-					gl.glBegin(gl.GL_QUADS)
-					for _,uv in ipairs(uvs) do
-						gl.glVertex2f(uv:unpack())
-					end
-					gl.glEnd()
-				end,
+			fbo:bind()
+			fbo:setColorAttachmentTex2D(args.tex.id)
+			fbo:check()
+			gl.glClear(gl.GL_COLOR_BUFFER_BIT)
+			args.obj:draw{
+				uniforms = {
+					projMat = self.fboProjMat.ptr,
+					mvMat = self.identMat.ptr,
+					dLambda = dLambda,
+					iterationsPerUpdate = iterationsPerUpdate,
+				},
+				texs = {
+					lightPosTexs[1],
+					lightVelTexs[1],
+				},
 			}
+			fbo:unbind()
 		end
-		
+
 		-- swap
 		lightPosTexs[1], lightPosTexs[2] = lightPosTexs[2], lightPosTexs[1]
 		lightVelTexs[1], lightVelTexs[2] = lightVelTexs[2], lightVelTexs[1]
@@ -550,48 +634,40 @@ view.pos = oldpos
 	gl.glViewport(0,0,viewWidth, viewHeight)
 	gl.glClear(gl.GL_COLOR_BUFFER_BIT)
 
-	gl.glMatrixMode(gl.GL_PROJECTION)
-	gl.glLoadIdentity()
-	gl.glOrtho(0,1,0,1,-1,1)
-	gl.glMatrixMode(gl.GL_MODELVIEW)
 	view:setupModelView()
 	--gl.glLoadIdentity()
 	--gl.glTranslatef(20, 0, 0)
 
-	drawLightShader:use()
-	lightPosTexs[1]:bind(0)
-	skyTex:bind(1)
-	gl.glBegin(gl.GL_QUADS)
-	for _,uv in ipairs(uvs) do
-		gl.glVertex2f(uv:unpack())
-	end
-	gl.glEnd()
-	drawLightShader:useNone()
-
-	gl.glLoadIdentity()
-	gl.glActiveTexture(gl.GL_TEXTURE0)
+	drawLightSceneObj.texs[1] = lightPosTexs[1]
+	drawLightSceneObj:draw{
+		uniforms = {
+			projMat = self.fboProjMat.ptr,
+			mvMat = view.mvMat.ptr,
+		},
+	}
 
 	-- [[
 	local oldpos = view.pos
 	view:setup(aspectRatio)
-	
-	gl.glPolygonMode(gl.GL_FRONT_AND_BACK, gl.GL_LINE)
-	gl.glBegin(gl.GL_QUADS)
-	local s = 1
-	for _,face in ipairs(cubeFaces) do
-		for _,i in ipairs(face) do
-			local x = bit.band(i, 1)
-			local y = bit.band(bit.rshift(i, 1), 1)
-			local z = bit.band(bit.rshift(i, 2), 1)
-			gl.glVertex3d(s*(x*2-1),s*(y*2-1),s*(z*2-1))
-		end
-	end
-	gl.glEnd()
-	gl.glPolygonMode(gl.GL_FRONT_AND_BACK, gl.GL_FILL)
+
+	self.wireframeSceneObj:draw{
+		uniforms = {
+			mvProjMat = view.mvProjMat.ptr,
+		},
+	}
 	--]]
 
-	glreport('update done')
+glreport'update done'
 	App.super.update(self)
 end
 
-App():run()
+function App:updateGUI()
+	ig.igText'testing testing'
+	if ig.igButton'reset' then
+		lightInitialized = false
+	end
+	ig.luatableInputFloat('delta lambda', _G, 'dLambda')
+	ig.luatableInputInt('iterations', _G, 'iterationsPerUpdate')
+end
+
+return App():run()
