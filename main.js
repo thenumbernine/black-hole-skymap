@@ -24,9 +24,9 @@ let gl;
 let glutil;
 
 const objectTypes = [
-	'Schwarzschild Black Hole',	
-	'Kerr Black Hole degeneracy',	
-	'Kerr Black Hole',	
+	'Schwarzschild Black Hole',
+	'Kerr Black Hole degeneracy',
+	'Kerr Black Hole',
 	'Alcubierre Warp Drive Bubble',
 ];
 _G.objectTypes = objectTypes;
@@ -40,23 +40,23 @@ _G.warpBubbleThickness = .01;
 _G.warpBubbleVelocity = 1.5;
 _G.warpBubbleRadius = 1;
 
-_G.deltaLambda = 1;	//ray forward iteration
+_G.deltaLambda = .1;	//ray forward iteration
 _G.simTime = 0;
 
-let ident4 = mat4.create();
+const ident4 = mat4.create();
 
-function tanh(x) {
-	let exp2x = Math.exp(2 * x);
+const tanh = x => {
+	const exp2x = Math.exp(2 * x);
 	return (exp2x - 1) / (exp2x + 1);
 }
 
-function sech(x) {
-	let expx = Math.exp(x);
+const sech = x => {
+	const expx = Math.exp(x);
 	return 2. * expx / (expx * expx + 1.);
 }
 
-function sechSq(x) {
-	let y = sech(x);
+const sechSq = x => {
+	const y = sech(x);
 	return y * y;
 }
 
@@ -71,7 +71,7 @@ float sechSq(float x) {
 	return y * y;
 }
 
-vec3 quatRotate(vec4 q, vec3 v) { 
+vec3 quatRotate(vec4 q, vec3 v) {
 	return v + 2. * cross(cross(v, q.xyz) - q.w * v, q.xyz);
 }
 
@@ -80,7 +80,7 @@ vec4 quatConj(vec4 q) {
 }
 `;
 
-function stupidPrint(s) {
+const stupidPrint = s => {
 /*
 	s.split('\n').forEach(l => {
 		console.log(l);
@@ -116,17 +116,17 @@ let skyboxRendererClassName;
 //however courtesy of the scenegraph's globals (which I am not too happy about my current design), this will take a bit more work
 //so in the mean time, this will take a page reset every time the glutil changes
 
-function resize() {
+const resize = () => {
 	canvas.width = window.innerWidth;
 	canvas.height = window.innerHeight;
 	glutil.resize();
 
-	let info = ids.info;
-	let width = window.innerWidth 
+	const info = ids.info;
+	const width = window.innerWidth
 		- parseInt(info.style.paddingLeft)
 		- parseInt(info.style.paddingRight);
 	info.style.width = width+'px';
-	let height = window.innerHeight
+	const height = window.innerHeight
 		- parseInt(info.style.paddingTop)
 		- parseInt(info.style.paddingBottom);
 	info.style.height = (height - 32)+'px';
@@ -134,10 +134,10 @@ function resize() {
 
 // render loop
 
-function update() {
+const update = () => {
 	skyboxRenderer.update();
 	requestAnimationFrame(update);
-};
+}
 
 _G.mouseMethod = 'rotateCamera';
 //_G.mouseMethod = 'rotateObject';
@@ -148,8 +148,8 @@ let mouse;
 
 _G.objectAngle = quat.create();
 
-let initAngle = [];
-let initAngleInv = [];
+const initAngle = [];
+const initAngleInv = [];
 
 const skyTexFilenames = [
 	'skytex/sky-visible-cube-xp.png',
@@ -200,7 +200,7 @@ const refreshObjectTypeParamDivs = () => {
 	});
 };
 objectTypes.forEach(v => {
-	const id = v.replace(new RegExp(' ', 'g'), '_')+'_params';
+	const id = v+' params';
 	if (!(id in ids)) {
 		console.log("couldn't find params for ", v, id);
 		return;
@@ -236,12 +236,14 @@ refreshObjectTypeParamDivs();
 	});
 });
 
-skyboxRendererClassName = 'GeodesicFBORenderer';
-let classname = urlparams.get('renderer');
-if (classname) {
-	skyboxRendererClassName = classname;
+{
+	skyboxRendererClassName = 'GeodesicFBORenderer';
+	const classname = urlparams.get('renderer');
+	if (classname) {
+		skyboxRendererClassName = classname;
+	}
+	if (skyboxRendererClassNames.indexOf(skyboxRendererClassName) == -1) throw "unable to find skybox renderer named "+skyboxRendererClassName;
 }
-if (skyboxRendererClassNames.indexOf(skyboxRendererClassName) == -1) throw "unable to find skybox renderer named "+skyboxRendererClassName;
 
 skyboxRendererClassNames.forEach(name => {
 	if (!(name in ids)) {
@@ -300,15 +302,7 @@ skyboxRenderer = new cl();
 
 gl.disable(gl.DITHER);
 
-console.log('calling preload...');
-let main2Initialized = false;
 preload(skyTexFilenames, () => {
-	if (main2Initialized) {
-		console.log("main2 got called twice again.  check the preloader.");
-		return;
-	}
-	main2Initialized = true; 
-	
 	glutil.view.zNear = .1;
 	glutil.view.zFar = 100;
 	glutil.view.fovY = 90;
@@ -316,7 +310,6 @@ preload(skyTexFilenames, () => {
 	quat.copy(initAngle, glutil.view.angle);
 	quat.conjugate(initAngleInv, initAngle);
 
-	console.log('creating skyTex', skyTexFilenames);
 	const skyTex = new glutil.TextureCube({
 		flipY : false,
 		generateMipmap : true,
@@ -327,16 +320,13 @@ preload(skyTexFilenames, () => {
 			t : gl.CLAMP_TO_EDGE
 		},
 		urls : skyTexFilenames,
-		onload : function(side,url,image) {
-console.log('onload');			
+		onload : (side,url,image) => {
 			if (image.width > glMaxCubeMapTextureSize || image.height > glMaxCubeMapTextureSize) {
 				throw "cube map size "+image.width+"x"+image.height+" cannot exceed "+glMaxCubeMapTextureSize;
 			}
 		},
 		done : () => {
-console.log('done');			
 			skyboxRenderer.initScene(skyTex);
-console.log('2');
 			document.querySelectorAll('input[name="mouseMethod"]').forEach(o => {
 				o.addEventListener('click', e => {
 					_G[o.name] = o.value;
@@ -348,12 +338,11 @@ console.log('2');
 				});
 			});
 
-console.log('3');
-			const tmpQ = quat.create();	
+			const tmpQ = quat.create();
 			mouse = new Mouse3D({
 				pressObj : canvas,
-				move : function(dx,dy) {
-					let rotAngle = Math.PI / 180 * .01 * Math.sqrt(dx*dx + dy*dy);
+				move : (dx,dy) => {
+					const rotAngle = Math.PI / 180 * .01 * Math.sqrt(dx*dx + dy*dy);
 					quat.setAxisAngle(tmpQ, [dy, dx, 0], rotAngle);
 
 					if (_G.mouseMethod == 'rotateCamera') {
@@ -371,14 +360,13 @@ console.log('3');
 						skyboxRenderer.resetField();
 					}
 				},
-				zoom : function(dz) {
+				zoom : dz => {
 					glutil.view.fovY *= Math.exp(-.0003 * dz);
 					glutil.view.fovY = clamp(glutil.view.fovY, 1, 179);
 					glutil.updateProjection();
 				}
 			});
-			
-console.log('4');
+
 			const setRunning = e => { skyboxRenderer.runSimulation = ids.runSimulation.checked; };
 			ids.runSimulation.addEventListener('click', setRunning);
 			setRunning();
