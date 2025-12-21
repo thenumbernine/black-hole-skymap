@@ -37,7 +37,7 @@ local GLTex2D = require 'gl.tex2d'
 local GLTexCube = require 'gl.texcube'
 local GLGeometry = require 'gl.geometry'
 local GLSceneObject = require 'gl.sceneobject'
-local FBO = require 'gl.fbo'
+local GLFramebuffer = require 'gl.framebuffer'
 local glreport = require 'gl.report'
 
 --local viewRot = quatd(0,math.sqrt(.5),0,math.sqrt(.5))*quatd(math.sqrt(.5),0,0,-math.sqrt(.5))
@@ -274,7 +274,7 @@ void main() {
 		end
 	end
 
-	fbo = FBO{width=lightRes, height=lightRes}:unbind()
+	fbo = GLFramebuffer{width=lightRes, height=lightRes}:unbind()
 
 	local iterateLightShaderVertexCode = [[
 in vec2 vertex;
