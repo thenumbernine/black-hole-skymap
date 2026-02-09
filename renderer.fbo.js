@@ -1,5 +1,5 @@
 import {mat3} from '/js/gl-matrix-3.4.1/index.js';
-import {makeUnitQuad} from '/js/gl-util-UnitQuad.js';
+import {makeUnitQuad} from '/js/gl/UnitQuad.js';
 const makeGeodesicFBORenderer = _G => {
 const glutil = _G.glutil;
 glutil.import('UnitQuad', makeUnitQuad);
