@@ -23,7 +23,6 @@ conn^phi_theta_theta = -sin(phi) cos(phi)
 --]]
 
 local openglapp = require 'openglapp'
-local bit = require 'bit'
 local ffi = require 'ffi'
 local gl = require 'gl'
 local glu = require 'ffi.req' 'glu'

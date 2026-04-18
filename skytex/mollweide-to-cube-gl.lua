@@ -1,5 +1,4 @@
 local openglapp = require 'openglapp'
-local bit = require 'bit'
 local gl = require 'gl'
 local glu = require 'ffi.req' 'glu'
 local sdl = require 'sdl'
